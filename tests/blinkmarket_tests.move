@@ -7,14 +7,20 @@ use sui::sui::SUI;
 use sui::clock;
 use std::unit_test;
 
-use blinkmarket::blinkmarket::{
+use blinkmarket::blink_config::{
     Self,
     AdminCap,
     MarketCreatorCap,
     Market,
-    PredictionEvent,
-    Position,
     Treasury,
+};
+use blinkmarket::blink_event::{
+    Self,
+    PredictionEvent,
+};
+use blinkmarket::blink_position::{
+    Self,
+    Position,
 };
 
 // Test addresses
@@ -34,7 +40,7 @@ const PLATFORM_FEE_BPS: u64 = 200; // 2%
 fun setup_test(): Scenario {
     let mut scenario = ts::begin(ADMIN);
     {
-        blinkmarket::init_for_testing(ts::ctx(&mut scenario));
+        blink_config::init_for_testing(ts::ctx(&mut scenario));
     };
     scenario
 }
@@ -43,7 +49,7 @@ fun create_test_market(scenario: &mut Scenario): MarketCreatorCap {
     ts::next_tx(scenario, ADMIN);
     let admin_cap = ts::take_from_sender<AdminCap>(scenario);
 
-    let creator_cap = blinkmarket::create_market(
+    let creator_cap = blink_config::create_market(
         &admin_cap,
         b"NBA",
         b"NBA Basketball Predictions",
@@ -62,7 +68,7 @@ fun add_oracle_to_market(scenario: &mut Scenario) {
     let admin_cap = ts::take_from_sender<AdminCap>(scenario);
     let mut market = ts::take_shared<Market>(scenario);
 
-    blinkmarket::add_oracle(&admin_cap, &mut market, ORACLE);
+    blink_config::add_oracle(&admin_cap, &mut market, ORACLE);
 
     ts::return_shared(market);
     ts::return_to_sender(scenario, admin_cap);
@@ -73,7 +79,7 @@ fun create_test_event(scenario: &mut Scenario, creator_cap: &MarketCreatorCap) {
     let market = ts::take_shared<Market>(scenario);
 
     let outcome_labels = vector[b"Yes", b"No"];
-    blinkmarket::create_event(
+    blink_event::create_event(
         creator_cap,
         &market,
         b"Will the next shot be a 3-pointer?",
@@ -106,8 +112,8 @@ fun test_init_creates_admin_cap_and_treasury() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let treasury = ts::take_shared<Treasury>(&scenario);
-        assert!(blinkmarket::get_treasury_balance(&treasury) == 0, 1);
-        assert!(blinkmarket::get_total_fees_collected(&treasury) == 0, 2);
+        assert!(blink_config::get_treasury_balance(&treasury) == 0, 1);
+        assert!(blink_config::get_total_fees_collected(&treasury) == 0, 2);
         ts::return_shared(treasury);
     };
 
@@ -126,10 +132,10 @@ fun test_create_market() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let market = ts::take_shared<Market>(&scenario);
-        assert!(blinkmarket::get_market_min_stake(&market) == MIN_STAKE, 0);
-        assert!(blinkmarket::get_market_max_stake(&market) == MAX_STAKE, 1);
-        assert!(blinkmarket::get_market_fee_bps(&market) == PLATFORM_FEE_BPS, 2);
-        assert!(blinkmarket::is_market_active(&market), 3);
+        assert!(blink_config::get_market_min_stake(&market) == MIN_STAKE, 0);
+        assert!(blink_config::get_market_max_stake(&market) == MAX_STAKE, 1);
+        assert!(blink_config::get_market_fee_bps(&market) == PLATFORM_FEE_BPS, 2);
+        assert!(blink_config::is_market_active(&market), 3);
         ts::return_shared(market);
     };
 
@@ -150,8 +156,8 @@ fun test_add_and_remove_oracle() {
         let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
         let mut market = ts::take_shared<Market>(&scenario);
 
-        blinkmarket::add_oracle(&admin_cap, &mut market, ORACLE);
-        assert!(blinkmarket::is_oracle(&market, ORACLE), 0);
+        blink_config::add_oracle(&admin_cap, &mut market, ORACLE);
+        assert!(blink_config::is_oracle(&market, ORACLE), 0);
 
         ts::return_shared(market);
         ts::return_to_sender(&scenario, admin_cap);
@@ -163,8 +169,8 @@ fun test_add_and_remove_oracle() {
         let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
         let mut market = ts::take_shared<Market>(&scenario);
 
-        blinkmarket::remove_oracle(&admin_cap, &mut market, ORACLE);
-        assert!(!blinkmarket::is_oracle(&market, ORACLE), 1);
+        blink_config::remove_oracle(&admin_cap, &mut market, ORACLE);
+        assert!(!blink_config::is_oracle(&market, ORACLE), 1);
 
         ts::return_shared(market);
         ts::return_to_sender(&scenario, admin_cap);
@@ -185,8 +191,8 @@ fun test_set_market_active() {
         let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
         let mut market = ts::take_shared<Market>(&scenario);
 
-        blinkmarket::set_market_active(&admin_cap, &mut market, false);
-        assert!(!blinkmarket::is_market_active(&market), 0);
+        blink_config::set_market_active(&admin_cap, &mut market, false);
+        assert!(!blink_config::is_market_active(&market), 0);
 
         ts::return_shared(market);
         ts::return_to_sender(&scenario, admin_cap);
@@ -208,7 +214,7 @@ fun test_event_lifecycle_created_to_open() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let event = ts::take_shared<PredictionEvent>(&scenario);
-        assert!(blinkmarket::get_event_status(&event) == blinkmarket::get_status_created(), 0);
+        assert!(blink_event::get_event_status(&event) == blink_event::get_status_created(), 0);
         ts::return_shared(event);
     };
 
@@ -216,8 +222,8 @@ fun test_event_lifecycle_created_to_open() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
-        assert!(blinkmarket::get_event_status(&event) == blinkmarket::get_status_open(), 1);
+        blink_event::open_event(&creator_cap, &mut event);
+        assert!(blink_event::get_event_status(&event) == blink_event::get_status_open(), 1);
         ts::return_shared(event);
     };
 
@@ -235,9 +241,9 @@ fun test_event_lifecycle_open_to_locked() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
-        blinkmarket::lock_event(&creator_cap, &mut event);
-        assert!(blinkmarket::get_event_status(&event) == blinkmarket::get_status_locked(), 0);
+        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
+        assert!(blink_event::get_event_status(&event) == blink_event::get_status_locked(), 0);
         ts::return_shared(event);
     };
 
@@ -255,9 +261,9 @@ fun test_event_cancellation() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
-        blinkmarket::cancel_event(&creator_cap, &mut event);
-        assert!(blinkmarket::get_event_status(&event) == blinkmarket::get_status_cancelled(), 0);
+        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::cancel_event(&creator_cap, &mut event);
+        assert!(blink_event::get_event_status(&event) == blink_event::get_status_cancelled(), 0);
         ts::return_shared(event);
     };
 
@@ -277,7 +283,7 @@ fun test_place_bet() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -293,7 +299,7 @@ fun test_place_bet() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario)); // 0.1 SUI
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -304,15 +310,15 @@ fun test_place_bet() {
         );
 
         // Verify position
-        assert!(blinkmarket::get_position_stake(&position) == 98_000_000, 0); // 2% fee deducted
-        assert!(blinkmarket::get_position_outcome(&position) == 0, 1);
-        assert!(!blinkmarket::is_position_claimed(&position), 2);
+        assert!(blink_position::get_position_stake(&position) == 98_000_000, 0); // 2% fee deducted
+        assert!(blink_position::get_position_outcome(&position) == 0, 1);
+        assert!(!blink_position::is_position_claimed(&position), 2);
 
         // Verify treasury collected fee
-        assert!(blinkmarket::get_treasury_balance(&treasury) == 2_000_000, 3); // 2% of 100M
+        assert!(blink_config::get_treasury_balance(&treasury) == 2_000_000, 3); // 2% of 100M
 
         // Verify event pool
-        assert!(blinkmarket::get_total_pool(&event) == 98_000_000, 4);
+        assert!(blink_event::get_total_pool(&event) == 98_000_000, 4);
 
         ts::return_shared(event);
         ts::return_shared(market);
@@ -326,7 +332,7 @@ fun test_place_bet() {
 }
 
 #[test]
-#[expected_failure(abort_code = 202, location = blinkmarket)] // EStakeTooLow
+#[expected_failure(abort_code = 202, location = blink_position)] // EStakeTooLow
 fun test_place_bet_stake_too_low() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -336,7 +342,7 @@ fun test_place_bet_stake_too_low() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -351,7 +357,7 @@ fun test_place_bet_stake_too_low() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100, ts::ctx(&mut scenario)); // Too low
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -373,7 +379,7 @@ fun test_place_bet_stake_too_low() {
 }
 
 #[test]
-#[expected_failure(abort_code = 101, location = blinkmarket)] // EEventNotOpen
+#[expected_failure(abort_code = 101, location = blink_event)] // EEventNotOpen
 fun test_place_bet_event_not_open() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -390,7 +396,7 @@ fun test_place_bet_event_not_open() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -412,7 +418,7 @@ fun test_place_bet_event_not_open() {
 }
 
 #[test]
-#[expected_failure(abort_code = 301, location = blinkmarket)] // EBettingClosed
+#[expected_failure(abort_code = 301, location = blink_event)] // EBettingClosed
 fun test_place_bet_after_betting_window() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -423,7 +429,7 @@ fun test_place_bet_after_betting_window() {
         let market = ts::take_shared<Market>(&scenario);
 
         let outcome_labels = vector[b"Yes", b"No"];
-        blinkmarket::create_event(
+        blink_event::create_event(
             &creator_cap,
             &market,
             b"Test event",
@@ -440,7 +446,7 @@ fun test_place_bet_after_betting_window() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -456,7 +462,7 @@ fun test_place_bet_after_betting_window() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -490,7 +496,7 @@ fun test_full_betting_resolution_and_claim() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -505,7 +511,7 @@ fun test_full_betting_resolution_and_claim() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -529,7 +535,7 @@ fun test_full_betting_resolution_and_claim() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(200_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -553,7 +559,7 @@ fun test_full_betting_resolution_and_claim() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(300_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -573,7 +579,7 @@ fun test_full_betting_resolution_and_claim() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::lock_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -583,7 +589,7 @@ fun test_full_betting_resolution_and_claim() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let market = ts::take_shared<Market>(&scenario);
 
-        blinkmarket::resolve_event(
+        blink_event::resolve_event(
             &mut event,
             &market,
             0, // Yes wins
@@ -591,7 +597,7 @@ fun test_full_betting_resolution_and_claim() {
             ts::ctx(&mut scenario),
         );
 
-        assert!(blinkmarket::get_event_status(&event) == blinkmarket::get_status_resolved(), 0);
+        assert!(blink_event::get_event_status(&event) == blink_event::get_status_resolved(), 0);
 
         ts::return_shared(event);
         ts::return_shared(market);
@@ -606,7 +612,7 @@ fun test_full_betting_resolution_and_claim() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let mut position = ts::take_from_sender<Position>(&scenario);
 
-        let winnings = blinkmarket::claim_winnings(
+        let winnings = blink_position::claim_winnings(
             &mut event,
             &mut position,
             ts::ctx(&mut scenario),
@@ -614,7 +620,7 @@ fun test_full_betting_resolution_and_claim() {
 
         // Verify payout calculation: (98/294) * 588 = 196
         assert!(coin::value(&winnings) == 196_000_000, 1);
-        assert!(blinkmarket::is_position_claimed(&position), 2);
+        assert!(blink_position::is_position_claimed(&position), 2);
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
@@ -627,7 +633,7 @@ fun test_full_betting_resolution_and_claim() {
 }
 
 #[test]
-#[expected_failure(abort_code = 105, location = blinkmarket)] // EPositionAlreadyClaimed
+#[expected_failure(abort_code = 105, location = blink_position)] // EPositionAlreadyClaimed
 fun test_double_claim_prevention() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -638,7 +644,7 @@ fun test_double_claim_prevention() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -653,7 +659,7 @@ fun test_double_claim_prevention() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -673,7 +679,7 @@ fun test_double_claim_prevention() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::lock_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -681,7 +687,7 @@ fun test_double_claim_prevention() {
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let market = ts::take_shared<Market>(&scenario);
-        blinkmarket::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
         ts::return_shared(event);
         ts::return_shared(market);
     };
@@ -692,7 +698,7 @@ fun test_double_claim_prevention() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let mut position = ts::take_from_sender<Position>(&scenario);
 
-        let winnings = blinkmarket::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
@@ -705,7 +711,7 @@ fun test_double_claim_prevention() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let mut position = ts::take_from_sender<Position>(&scenario);
 
-        let winnings = blinkmarket::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
@@ -718,7 +724,7 @@ fun test_double_claim_prevention() {
 }
 
 #[test]
-#[expected_failure(abort_code = 106, location = blinkmarket)] // ENotWinningOutcome
+#[expected_failure(abort_code = 106, location = blink_position)] // ENotWinningOutcome
 fun test_claim_losing_position() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -729,7 +735,7 @@ fun test_claim_losing_position() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -744,7 +750,7 @@ fun test_claim_losing_position() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -764,7 +770,7 @@ fun test_claim_losing_position() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::lock_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -772,7 +778,7 @@ fun test_claim_losing_position() {
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let market = ts::take_shared<Market>(&scenario);
-        blinkmarket::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario)); // Yes wins
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario)); // Yes wins
         ts::return_shared(event);
         ts::return_shared(market);
     };
@@ -783,7 +789,7 @@ fun test_claim_losing_position() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let mut position = ts::take_from_sender<Position>(&scenario);
 
-        let winnings = blinkmarket::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
@@ -807,7 +813,7 @@ fun test_refund_on_cancelled_event() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -822,7 +828,7 @@ fun test_refund_on_cancelled_event() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -842,7 +848,7 @@ fun test_refund_on_cancelled_event() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::cancel_event(&creator_cap, &mut event);
+        blink_event::cancel_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -852,7 +858,7 @@ fun test_refund_on_cancelled_event() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let position = ts::take_from_sender<Position>(&scenario);
 
-        let refund = blinkmarket::claim_refund(&mut event, position, ts::ctx(&mut scenario));
+        let refund = blink_position::claim_refund(&mut event, position, ts::ctx(&mut scenario));
 
         // Refund should be net stake (after platform fee)
         assert!(coin::value(&refund) == 98_000_000, 0);
@@ -878,7 +884,7 @@ fun test_cancel_bet_before_lock() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -893,7 +899,7 @@ fun test_cancel_bet_before_lock() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -915,7 +921,7 @@ fun test_cancel_bet_before_lock() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let position = ts::take_from_sender<Position>(&scenario);
 
-        let refund = blinkmarket::cancel_bet(&mut event, position, ts::ctx(&mut scenario));
+        let refund = blink_position::cancel_bet(&mut event, position, ts::ctx(&mut scenario));
 
         // 1% cancellation fee: 98M * 0.99 = 97.02M
         assert!(coin::value(&refund) == 97_020_000, 0);
@@ -930,7 +936,7 @@ fun test_cancel_bet_before_lock() {
 }
 
 #[test]
-#[expected_failure(abort_code = 302, location = blinkmarket)] // EEventAlreadyLocked
+#[expected_failure(abort_code = 302, location = blink_position)] // EEventAlreadyLocked
 fun test_cancel_bet_after_lock_fails() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -940,7 +946,7 @@ fun test_cancel_bet_after_lock_fails() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -955,7 +961,7 @@ fun test_cancel_bet_after_lock_fails() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(
+        let position = blink_position::place_bet(
             &mut event,
             &market,
             &mut treasury,
@@ -975,7 +981,7 @@ fun test_cancel_bet_after_lock_fails() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::lock_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -985,7 +991,7 @@ fun test_cancel_bet_after_lock_fails() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let position = ts::take_from_sender<Position>(&scenario);
 
-        let refund = blinkmarket::cancel_bet(&mut event, position, ts::ctx(&mut scenario));
+        let refund = blink_position::cancel_bet(&mut event, position, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
         unit_test::destroy(refund);
@@ -999,7 +1005,7 @@ fun test_cancel_bet_after_lock_fails() {
 // ============== Oracle Authorization Tests ==============
 
 #[test]
-#[expected_failure(abort_code = 1, location = blinkmarket)] // ENotOracle
+#[expected_failure(abort_code = 1, location = blink_event)] // ENotOracle
 fun test_non_oracle_cannot_resolve() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -1009,8 +1015,8 @@ fun test_non_oracle_cannot_resolve() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
-        blinkmarket::lock_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -1023,7 +1029,7 @@ fun test_non_oracle_cannot_resolve() {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
         let market = ts::take_shared<Market>(&scenario);
 
-        blinkmarket::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
         ts::return_shared(market);
@@ -1046,7 +1052,7 @@ fun test_get_odds() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -1061,13 +1067,13 @@ fun test_get_odds() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake1 = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position1 = blinkmarket::place_bet(&mut event, &market, &mut treasury, 0, stake1, &clock, ts::ctx(&mut scenario));
+        let position1 = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake1, &clock, ts::ctx(&mut scenario));
 
         let stake2 = mint_sui(200_000_000, ts::ctx(&mut scenario));
-        let position2 = blinkmarket::place_bet(&mut event, &market, &mut treasury, 1, stake2, &clock, ts::ctx(&mut scenario));
+        let position2 = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake2, &clock, ts::ctx(&mut scenario));
 
         // Check odds
-        let odds = blinkmarket::get_odds(&event);
+        let odds = blink_event::get_odds(&event);
         assert!(*odds.borrow(0) == 98_000_000, 0); // 100M - 2% = 98M
         assert!(*odds.borrow(1) == 196_000_000, 1); // 200M - 2% = 196M
 
@@ -1093,7 +1099,7 @@ fun test_calculate_potential_payout() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -1108,10 +1114,10 @@ fun test_calculate_potential_payout() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
 
         // Calculate potential payout for a 100M bet on outcome 1
-        let potential = blinkmarket::calculate_potential_payout(&event, 1, 100_000_000);
+        let potential = blink_event::calculate_potential_payout(&event, 1, 100_000_000);
         // No pool is currently empty (0), so function returns stake_amount directly (1:1 payout)
         assert!(potential == 100_000_000, 0);
 
@@ -1138,7 +1144,7 @@ fun test_withdraw_fees() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
 
@@ -1153,7 +1159,7 @@ fun test_withdraw_fees() {
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
         let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
-        let position = blinkmarket::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
         ts::return_shared(market);
@@ -1167,11 +1173,11 @@ fun test_withdraw_fees() {
         let admin_cap = ts::take_from_sender<AdminCap>(&scenario);
         let mut treasury = ts::take_shared<Treasury>(&scenario);
 
-        assert!(blinkmarket::get_treasury_balance(&treasury) == 2_000_000, 0);
+        assert!(blink_config::get_treasury_balance(&treasury) == 2_000_000, 0);
 
-        let withdrawn = blinkmarket::withdraw_fees(&admin_cap, &mut treasury, 1_000_000, ts::ctx(&mut scenario));
+        let withdrawn = blink_config::withdraw_fees(&admin_cap, &mut treasury, 1_000_000, ts::ctx(&mut scenario));
         assert!(coin::value(&withdrawn) == 1_000_000, 1);
-        assert!(blinkmarket::get_treasury_balance(&treasury) == 1_000_000, 2);
+        assert!(blink_config::get_treasury_balance(&treasury) == 1_000_000, 2);
 
         ts::return_shared(treasury);
         ts::return_to_sender(&scenario, admin_cap);
@@ -1196,7 +1202,7 @@ fun test_multi_outcome_event() {
         let market = ts::take_shared<Market>(&scenario);
 
         let outcome_labels = vector[b"Team A", b"Team B", b"Draw", b"Other"];
-        blinkmarket::create_event(
+        blink_event::create_event(
             &creator_cap,
             &market,
             b"Who wins the match?",
@@ -1213,10 +1219,10 @@ fun test_multi_outcome_event() {
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blinkmarket::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event);
 
         // Verify 4 outcomes
-        let odds = blinkmarket::get_odds(&event);
+        let odds = blink_event::get_odds(&event);
         assert!(odds.length() == 4, 0);
 
         ts::return_shared(event);
@@ -1227,7 +1233,7 @@ fun test_multi_outcome_event() {
 }
 
 #[test]
-#[expected_failure(abort_code = 205, location = blinkmarket)] // ETooFewOutcomes
+#[expected_failure(abort_code = 205, location = blink_event)] // ETooFewOutcomes
 fun test_too_few_outcomes() {
     let mut scenario = setup_test();
     let creator_cap = create_test_market(&mut scenario);
@@ -1238,7 +1244,7 @@ fun test_too_few_outcomes() {
         let market = ts::take_shared<Market>(&scenario);
 
         let outcome_labels = vector[b"Only One"];
-        blinkmarket::create_event(
+        blink_event::create_event(
             &creator_cap,
             &market,
             b"Invalid event",
