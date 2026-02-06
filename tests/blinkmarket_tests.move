@@ -5,7 +5,7 @@ use sui::test_scenario::{Self as ts, Scenario};
 use sui::coin::{Self, Coin};
 use sui::sui::SUI;
 use sui::clock;
-use std::unit_test;
+use sui::test_utils;
 
 use blinkmarket::blink_config::{
     Self,
@@ -141,7 +141,7 @@ fun test_create_market() {
 
     // Clean up
     ts::next_tx(&mut scenario, ADMIN);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -176,7 +176,7 @@ fun test_add_and_remove_oracle() {
         ts::return_to_sender(&scenario, admin_cap);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -198,7 +198,7 @@ fun test_set_market_active() {
         ts::return_to_sender(&scenario, admin_cap);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -227,7 +227,7 @@ fun test_event_lifecycle_created_to_open() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -247,7 +247,7 @@ fun test_event_lifecycle_open_to_locked() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -267,7 +267,7 @@ fun test_event_cancellation() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -327,7 +327,7 @@ fun test_place_bet() {
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -370,11 +370,11 @@ fun test_place_bet_stake_too_low() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -409,11 +409,11 @@ fun test_place_bet_event_not_open() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -475,11 +475,11 @@ fun test_place_bet_after_betting_window() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -624,11 +624,11 @@ fun test_full_betting_resolution_and_claim() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -702,7 +702,7 @@ fun test_double_claim_prevention() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     // Second claim (should fail)
@@ -715,11 +715,11 @@ fun test_double_claim_prevention() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -793,11 +793,11 @@ fun test_claim_losing_position() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -864,11 +864,11 @@ fun test_refund_on_cancelled_event() {
         assert!(coin::value(&refund) == 98_000_000, 0);
 
         ts::return_shared(event);
-        unit_test::destroy(refund);
+        test_utils::destroy(refund);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -927,11 +927,11 @@ fun test_cancel_bet_before_lock() {
         assert!(coin::value(&refund) == 97_020_000, 0);
 
         ts::return_shared(event);
-        unit_test::destroy(refund);
+        test_utils::destroy(refund);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -994,11 +994,11 @@ fun test_cancel_bet_after_lock_fails() {
         let refund = blink_position::cancel_bet(&mut event, position, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
-        unit_test::destroy(refund);
+        test_utils::destroy(refund);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1036,7 +1036,7 @@ fun test_non_oracle_cannot_resolve() {
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1080,12 +1080,12 @@ fun test_get_odds() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position1);
-        unit_test::destroy(position2);
+        test_utils::destroy(position1);
+        test_utils::destroy(position2);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1124,11 +1124,11 @@ fun test_calculate_potential_payout() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1181,11 +1181,11 @@ fun test_withdraw_fees() {
 
         ts::return_shared(treasury);
         ts::return_to_sender(&scenario, admin_cap);
-        unit_test::destroy(withdrawn);
+        test_utils::destroy(withdrawn);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1228,7 +1228,7 @@ fun test_multi_outcome_event() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1257,6 +1257,890 @@ fun test_too_few_outcomes() {
         ts::return_shared(market);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Additional Tests: Multiple Winners Claiming ==============
+
+#[test]
+fun test_multiple_winners_claim_correct_proportional_payout() {
+    // Scenario: Two winners (A and B) both bet on outcome 0 (Yes),
+    // one loser (C) bet on outcome 1 (No).
+    // A bets 100M, B bets 200M, C bets 300M
+    // After fees (2%): A=98M, B=196M, C=294M. Total pool=588M.
+    // Winning pool (Yes) = 294M.
+    // A payout: (98/294)*588 = 196M
+    // B payout: (196/294)*588 = 392M
+    // Total payout: 196+392 = 588M = total pool
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    // Open the event
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    // User A bets 100M on Yes (outcome 0)
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    // User B bets 200M on Yes (outcome 0)
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(200_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    // User C bets 300M on No (outcome 1)
+    ts::next_tx(&mut scenario, USER_C);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(300_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_C);
+    };
+
+    // Lock and resolve - Yes wins (outcome 0)
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // User A claims winnings: (98/294)*588 = 196M
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 196_000_000, 0);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    // User B claims winnings: (196/294)*588 = 392M
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 392_000_000, 1);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    // After both claims, total_pool tracking should still be 588M
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let event = ts::take_shared<PredictionEvent>(&scenario);
+        assert!(blink_event::get_total_pool(&event) == 588_000_000, 2);
+        ts::return_shared(event);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Owner Verification Tests ==============
+
+#[test]
+#[expected_failure(abort_code = 107, location = blink_position)]
+fun test_claim_winnings_wrong_owner() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // Transfer position to User B, then User C (not the owner) tries to claim
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let position = ts::take_from_sender<Position>(&scenario);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    ts::next_tx(&mut scenario, USER_C);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_address<Position>(&scenario, USER_B);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_to_address(USER_B, position);
+        test_utils::destroy(winnings);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+#[test]
+#[expected_failure(abort_code = 107, location = blink_position)]
+fun test_claim_refund_wrong_owner() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::cancel_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    // Transfer A's position to B, then C tries to claim refund
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let position = ts::take_from_sender<Position>(&scenario);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    ts::next_tx(&mut scenario, USER_C);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let position = ts::take_from_address<Position>(&scenario, USER_B);
+        let refund = blink_position::claim_refund(&mut event, position, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        test_utils::destroy(refund);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Resolution Timestamp Test ==============
+
+#[test]
+fun test_resolved_at_timestamp() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+    clock::set_for_testing(&mut clock, 1234567890);
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        assert!(blink_event::get_resolved_at(&event) == 1234567890, 0);
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Winning Pool Merge Verification Test ==============
+
+#[test]
+fun test_losing_pools_merged_into_winning_pool_on_resolve() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(200_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    // Verify pools before resolution
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let event = ts::take_shared<PredictionEvent>(&scenario);
+        let odds = blink_event::get_odds(&event);
+        assert!(*odds.borrow(0) == 98_000_000, 0);
+        assert!(*odds.borrow(1) == 196_000_000, 1);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // After resolution: winning pool should have all funds
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let event = ts::take_shared<PredictionEvent>(&scenario);
+        let odds = blink_event::get_odds(&event);
+        assert!(*odds.borrow(0) == 294_000_000, 2);
+        assert!(*odds.borrow(1) == 0, 3);
+        ts::return_shared(event);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Single Winner Gets Entire Pool Test ==============
+
+#[test]
+fun test_single_winner_gets_entire_pool() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    // User A bets 100M on Yes -> net 98M
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    // User B bets 500M on No -> net 490M
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(500_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // Sole winner gets entire pool: (98/98)*588 = 588M
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 588_000_000, 0);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Three-Outcome Event Test ==============
+
+#[test]
+fun test_three_outcome_resolution_and_claim() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::create_event(
+            &creator_cap,
+            &market,
+            b"Who wins? A, B, or Draw",
+            vector[b"Team A", b"Team B", b"Draw"],
+            0,
+            1000000000000,
+            ts::ctx(&mut scenario),
+        );
+        ts::return_shared(market);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    // A bets 100M on Team A (0) -> net 98M
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    // B bets 200M on Team B (1) -> net 196M
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(200_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    // C bets 300M on Draw (2) -> net 294M
+    ts::next_tx(&mut scenario, USER_C);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(300_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 2, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_C);
+    };
+
+    // Draw wins (outcome 2)
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 2, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // C wins entire pool: (294/294)*588 = 588M
+    ts::next_tx(&mut scenario, USER_C);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 588_000_000, 0);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    // All pools should be empty after claim
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let event = ts::take_shared<PredictionEvent>(&scenario);
+        let odds = blink_event::get_odds(&event);
+        assert!(*odds.borrow(0) == 0, 1);
+        assert!(*odds.borrow(1) == 0, 2);
+        assert!(*odds.borrow(2) == 0, 3);
+        ts::return_shared(event);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Position Owner View Function Test ==============
+
+#[test]
+fun test_get_position_owner() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        assert!(blink_position::get_position_owner(&position) == USER_A, 0);
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        test_utils::destroy(position);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Equal Stakes Test ==============
+
+#[test]
+fun test_equal_stakes_on_winning_side() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    // A and B each bet 100M on Yes -> net 98M each
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    // C bets 100M on No -> net 98M
+    ts::next_tx(&mut scenario, USER_C);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_C);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // Each winner: (98/196)*294 = 147M
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 147_000_000, 0);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 147_000_000, 1);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Large Value Overflow Prevention Test ==============
+
+#[test]
+fun test_large_values_no_overflow() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    add_oracle_to_market(&mut scenario);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::create_event(
+            &creator_cap,
+            &market,
+            b"Large value test",
+            vector[b"Yes", b"No"],
+            0,
+            1000000000000,
+            ts::ctx(&mut scenario),
+        );
+        ts::return_shared(market);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(1_000_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(1_000_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::lock_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, ORACLE);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        blink_event::resolve_event(&mut event, &market, 0, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+    };
+
+    // User A claims: (980M * 1960M) / 980M = 1960M
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let mut position = ts::take_from_sender<Position>(&scenario);
+        let winnings = blink_position::claim_winnings(&mut event, &mut position, ts::ctx(&mut scenario));
+        assert!(coin::value(&winnings) == 1_960_000_000, 0);
+        ts::return_shared(event);
+        ts::return_to_sender(&scenario, position);
+        test_utils::destroy(winnings);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
+    ts::end(scenario);
+}
+
+// ============== Multiple Refunds on Cancelled Event ==============
+
+#[test]
+fun test_multiple_refunds_on_cancelled_event() {
+    let mut scenario = setup_test();
+    let creator_cap = create_test_market(&mut scenario);
+    create_test_event(&mut scenario, &creator_cap);
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::open_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(100_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 0, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_A);
+    };
+
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let market = ts::take_shared<Market>(&scenario);
+        let mut treasury = ts::take_shared<Treasury>(&scenario);
+        let stake = mint_sui(200_000_000, ts::ctx(&mut scenario));
+        let position = blink_position::place_bet(&mut event, &market, &mut treasury, 1, stake, &clock, ts::ctx(&mut scenario));
+        ts::return_shared(event);
+        ts::return_shared(market);
+        ts::return_shared(treasury);
+        transfer::public_transfer(position, USER_B);
+    };
+
+    ts::next_tx(&mut scenario, ADMIN);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        blink_event::cancel_event(&creator_cap, &mut event);
+        ts::return_shared(event);
+    };
+
+    ts::next_tx(&mut scenario, USER_A);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let position = ts::take_from_sender<Position>(&scenario);
+        let refund = blink_position::claim_refund(&mut event, position, ts::ctx(&mut scenario));
+        assert!(coin::value(&refund) == 98_000_000, 0);
+        ts::return_shared(event);
+        test_utils::destroy(refund);
+    };
+
+    ts::next_tx(&mut scenario, USER_B);
+    {
+        let mut event = ts::take_shared<PredictionEvent>(&scenario);
+        let position = ts::take_from_sender<Position>(&scenario);
+        let refund = blink_position::claim_refund(&mut event, position, ts::ctx(&mut scenario));
+        assert!(coin::value(&refund) == 196_000_000, 1);
+        ts::return_shared(event);
+        test_utils::destroy(refund);
+    };
+
+    clock::destroy_for_testing(clock);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }

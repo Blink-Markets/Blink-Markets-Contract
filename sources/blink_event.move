@@ -58,6 +58,8 @@ public struct PredictionEvent has key, store {
     betting_end_time: u64,
     winning_outcome: u8,
     creator: address,
+    resolved_at: u64,
+    winning_pool_at_resolution: u64,
 }
 
 // ============== Events ==============
@@ -117,6 +119,8 @@ public fun create_event(
         betting_end_time,
         winning_outcome: 0,
         creator: tx_context::sender(ctx),
+        resolved_at: 0,
+        winning_pool_at_resolution: 0,
     };
 
     event::emit(EventCreated {
@@ -178,7 +182,7 @@ public fun resolve_event(
     prediction_event: &mut PredictionEvent,
     market: &Market,
     winning_outcome: u8,
-    _clock: &Clock,
+    clock: &Clock,
     ctx: &mut TxContext,
 ) {
     // Validate caller is authorized oracle
@@ -196,6 +200,28 @@ public fun resolve_event(
     // Set resolution
     prediction_event.winning_outcome = winning_outcome;
     prediction_event.status = STATUS_RESOLVED;
+    prediction_event.resolved_at = clock::timestamp_ms(clock);
+
+    // Record the winning pool balance before merging losing pools
+    let winning_idx = winning_outcome as u64;
+    prediction_event.winning_pool_at_resolution = balance::value(
+        &prediction_event.outcome_pools[winning_idx]
+    );
+
+    // Join all losing outcome pools into the winning pool
+    let mut i = 0;
+    while (i < num_outcomes) {
+        if (i != winning_idx) {
+            let losing_balance = balance::withdraw_all(
+                &mut prediction_event.outcome_pools[i]
+            );
+            balance::join(
+                &mut prediction_event.outcome_pools[winning_idx],
+                losing_balance,
+            );
+        };
+        i = i + 1;
+    };
 
     event::emit(EventResolved {
         event_id: object::id(prediction_event),
@@ -230,29 +256,14 @@ public(package) fun remove_from_pool(
     withdrawn
 }
 
-/// Withdraw payout from pools (called by blink_position for claims)
+/// Withdraw payout from the winning pool (called by blink_position for claims)
 public(package) fun withdraw_payout(
     prediction_event: &mut PredictionEvent,
     payout_amount: u64,
 ): Balance<SUI> {
-    let mut payout_balance = balance::zero<SUI>();
-    let num_pools = prediction_event.outcome_pools.length();
-    let mut remaining = payout_amount;
-    let mut i = 0;
-
-    while (i < num_pools && remaining > 0) {
-        let pool = &mut prediction_event.outcome_pools[i];
-        let pool_value = balance::value(pool);
-        let take_amount = if (pool_value <= remaining) { pool_value } else { remaining };
-        if (take_amount > 0) {
-            let taken = balance::split(pool, take_amount);
-            balance::join(&mut payout_balance, taken);
-            remaining = remaining - take_amount;
-        };
-        i = i + 1;
-    };
-
-    payout_balance
+    let winning_idx = prediction_event.winning_outcome as u64;
+    let winning_pool = &mut prediction_event.outcome_pools[winning_idx];
+    balance::split(winning_pool, payout_amount)
 }
 
 // ============== Validation Helpers (package-internal) ==============
@@ -312,6 +323,13 @@ public(package) fun get_winning_pool_balance(
     balance::value(&prediction_event.outcome_pools[outcome_index as u64])
 }
 
+/// Get the winning pool balance recorded at resolution time (before merge)
+public(package) fun get_winning_pool_at_resolution(
+    prediction_event: &PredictionEvent,
+): u64 {
+    prediction_event.winning_pool_at_resolution
+}
+
 /// Get total pool amount
 public(package) fun get_total_pool_amount(prediction_event: &PredictionEvent): u64 {
     prediction_event.total_pool
@@ -353,7 +371,9 @@ public fun calculate_potential_payout(
     let new_total_pool = total_pool + stake_amount;
 
     // Potential payout: (stake / new_outcome_pool) * new_total_pool
-    (stake_amount * new_total_pool) / new_outcome_pool
+    // Use u128 to avoid overflow
+    let numerator = (stake_amount as u128) * (new_total_pool as u128);
+    (numerator / (new_outcome_pool as u128)) as u64
 }
 
 /// Check if betting is currently open
@@ -380,6 +400,12 @@ public fun get_total_pool(prediction_event: &PredictionEvent): u64 {
 public fun get_winning_outcome(prediction_event: &PredictionEvent): u8 {
     assert!(prediction_event.status == STATUS_RESOLVED, EEventNotResolved);
     prediction_event.winning_outcome
+}
+
+/// Get resolution timestamp (only valid after resolution)
+public fun get_resolved_at(prediction_event: &PredictionEvent): u64 {
+    assert!(prediction_event.status == STATUS_RESOLVED, EEventNotResolved);
+    prediction_event.resolved_at
 }
 
 // ============== Test-only Functions ==============
