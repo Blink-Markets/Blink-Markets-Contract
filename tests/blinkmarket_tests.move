@@ -5,7 +5,7 @@ use sui::test_scenario::{Self as ts, Scenario};
 use sui::coin::{Self, Coin};
 use sui::sui::SUI;
 use sui::clock;
-use std::unit_test;
+use sui::test_utils;
 
 use blinkmarket::blink_config::{
     Self,
@@ -141,7 +141,7 @@ fun test_create_market() {
 
     // Clean up
     ts::next_tx(&mut scenario, ADMIN);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -176,7 +176,7 @@ fun test_add_and_remove_oracle() {
         ts::return_to_sender(&scenario, admin_cap);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -198,7 +198,7 @@ fun test_set_market_active() {
         ts::return_to_sender(&scenario, admin_cap);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -227,7 +227,7 @@ fun test_event_lifecycle_created_to_open() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -247,7 +247,7 @@ fun test_event_lifecycle_open_to_locked() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -267,7 +267,7 @@ fun test_event_cancellation() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -327,7 +327,7 @@ fun test_place_bet() {
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -370,11 +370,11 @@ fun test_place_bet_stake_too_low() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -409,11 +409,11 @@ fun test_place_bet_event_not_open() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -475,11 +475,11 @@ fun test_place_bet_after_betting_window() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -624,11 +624,11 @@ fun test_full_betting_resolution_and_claim() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -702,7 +702,7 @@ fun test_double_claim_prevention() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     // Second claim (should fail)
@@ -715,11 +715,11 @@ fun test_double_claim_prevention() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -793,11 +793,11 @@ fun test_claim_losing_position() {
 
         ts::return_shared(event);
         ts::return_to_sender(&scenario, position);
-        unit_test::destroy(winnings);
+        test_utils::destroy(winnings);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -864,11 +864,11 @@ fun test_refund_on_cancelled_event() {
         assert!(coin::value(&refund) == 98_000_000, 0);
 
         ts::return_shared(event);
-        unit_test::destroy(refund);
+        test_utils::destroy(refund);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -927,11 +927,11 @@ fun test_cancel_bet_before_lock() {
         assert!(coin::value(&refund) == 97_020_000, 0);
 
         ts::return_shared(event);
-        unit_test::destroy(refund);
+        test_utils::destroy(refund);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -994,11 +994,11 @@ fun test_cancel_bet_after_lock_fails() {
         let refund = blink_position::cancel_bet(&mut event, position, ts::ctx(&mut scenario));
 
         ts::return_shared(event);
-        unit_test::destroy(refund);
+        test_utils::destroy(refund);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1036,7 +1036,7 @@ fun test_non_oracle_cannot_resolve() {
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1080,12 +1080,12 @@ fun test_get_odds() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position1);
-        unit_test::destroy(position2);
+        test_utils::destroy(position1);
+        test_utils::destroy(position2);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1124,11 +1124,11 @@ fun test_calculate_potential_payout() {
         ts::return_shared(event);
         ts::return_shared(market);
         ts::return_shared(treasury);
-        unit_test::destroy(position);
+        test_utils::destroy(position);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1181,11 +1181,11 @@ fun test_withdraw_fees() {
 
         ts::return_shared(treasury);
         ts::return_to_sender(&scenario, admin_cap);
-        unit_test::destroy(withdrawn);
+        test_utils::destroy(withdrawn);
     };
 
     clock::destroy_for_testing(clock);
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1228,7 +1228,7 @@ fun test_multi_outcome_event() {
         ts::return_shared(event);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
 
@@ -1257,6 +1257,6 @@ fun test_too_few_outcomes() {
         ts::return_shared(market);
     };
 
-    unit_test::destroy(creator_cap);
+    test_utils::destroy(creator_cap);
     ts::end(scenario);
 }

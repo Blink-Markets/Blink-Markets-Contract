@@ -17,6 +17,7 @@ use blinkmarket::blink_event::{Self, PredictionEvent};
 const EEventAlreadyLocked: u64 = 302;
 const EPositionAlreadyClaimed: u64 = 105;
 const ENotWinningOutcome: u64 = 106;
+const ENotAuthorized: u64 = 107;
 
 // Validation errors
 const EStakeTooLow: u64 = 202;
@@ -183,6 +184,9 @@ public fun claim_winnings(
     position: &mut Position,
     ctx: &mut TxContext,
 ): Coin<SUI> {
+    // Validate ownership
+    assert!(tx_context::sender(ctx) == position.owner, ENotAuthorized);
+
     // Validate event is resolved
     blink_event::assert_event_resolved(prediction_event);
     assert!(position.event_id == object::id(prediction_event), EEventMismatch);
@@ -192,20 +196,19 @@ public fun claim_winnings(
         ENotWinningOutcome
     );
 
-    // Calculate payout: (user_stake / winning_pool) * total_pool
-    let winning_pool_balance = blink_event::get_winning_pool_balance(
-        prediction_event,
-        position.outcome_index
-    );
+    // Calculate payout: (user_stake / winning_pool_at_resolution) * total_pool
+    // Use the winning pool balance recorded at resolution (before losing pools were merged)
+    let winning_pool_balance = blink_event::get_winning_pool_at_resolution(prediction_event);
     let total_pool = blink_event::get_total_pool_amount(prediction_event);
 
-    // Payout calculation with proper rounding
-    let payout_amount = (position.stake_amount * total_pool) / winning_pool_balance;
+    // Payout calculation with u128 to avoid overflow
+    let numerator = (position.stake_amount as u128) * (total_pool as u128);
+    let payout_amount = (numerator / (winning_pool_balance as u128)) as u64;
 
     // Mark as claimed
     position.is_claimed = true;
 
-    // Withdraw payout from pools
+    // Withdraw payout from the winning pool
     let payout_balance = blink_event::withdraw_payout(prediction_event, payout_amount);
 
     let claimer = tx_context::sender(ctx);
@@ -225,6 +228,9 @@ public fun claim_refund(
     position: Position,
     ctx: &mut TxContext,
 ): Coin<SUI> {
+    // Validate ownership
+    assert!(tx_context::sender(ctx) == position.owner, ENotAuthorized);
+
     // Validate event is cancelled
     blink_event::assert_event_cancelled(prediction_event);
     assert!(position.event_id == object::id(prediction_event), EEventMismatch);
@@ -265,4 +271,8 @@ public fun get_position_outcome(position: &Position): u8 {
 
 public fun is_position_claimed(position: &Position): bool {
     position.is_claimed
+}
+
+public fun get_position_owner(position: &Position): address {
+    position.owner
 }
