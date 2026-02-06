@@ -17,7 +17,7 @@ use blinkmarket::blink_event::{Self, PredictionEvent};
 const EEventAlreadyLocked: u64 = 302;
 const EPositionAlreadyClaimed: u64 = 105;
 const ENotWinningOutcome: u64 = 106;
-const ENotAuthorized: u64 = 107;
+const ENotAuthorized: u64 = 107; // Caller is not the position owner
 
 // Validation errors
 const EStakeTooLow: u64 = 202;
