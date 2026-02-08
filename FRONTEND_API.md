@@ -505,47 +505,66 @@ async function resolveManualEvent(
 }
 ```
 
-### 9. Resolve Crypto Event (Oracle Only)
+### 9. Resolve Crypto Event (Automated by Backend Keeper)
 
-**Important:** Must update Stork price feed in the same PTB before resolving.
+**⚠️ Important: Crypto events are automatically resolved by the backend keeper service.**
 
+**Frontend should NOT directly resolve crypto events** because:
+- ❌ Requires Stork API authentication (API keys)
+- ❌ Needs oracle private key for signing
+- ❌ Must execute atomic PTB (update + resolve)
+- ❌ Security risk exposing credentials to frontend
+
+**Backend keeper handles:**
+- ✅ Monitors pending crypto events
+- ✅ Fetches signed price data from Stork API
+- ✅ Builds and executes atomic PTB
+- ✅ Signed with authorized oracle keypair
+
+**Frontend role for crypto events:**
+- Query event status (via view functions)
+- Display resolution results after keeper completes
+- Listen to `EventResolved` events for real-time updates
+
+**Example: Monitor event resolution**
 ```typescript
-async function resolveCryptoEvent(
-  eventId: string,
-  marketId: string,
-  storkState: string,
-  storkUpdateData: any, // From Stork API
-  coinType: string
-) {
-  const tx = new TransactionBlock();
-  
-  // Step 1: Update Stork price feed
-  const feeCoin = tx.splitCoins(tx.gas, [tx.pure(1000000, 'u64')]); // Fee amount
-  
-  tx.moveCall({
-    target: `${STORK_PACKAGE_ID}::stork::update_single_temporal_numeric_value_evm`,
-    arguments: [
-      tx.object(storkState),
-      tx.pure(storkUpdateData, 'vector<u8>'),
-      feeCoin,
-    ],
+// Query event status
+async function checkEventStatus(eventId: string) {
+  const event = await client.getObject({
+    id: eventId,
+    options: { showContent: true },
   });
   
-  // Step 2: Resolve event (reads fresh price atomically)
-  tx.moveCall({
-    target: `${PACKAGE_ID}::blink_event::resolve_crypto_event`,
-    typeArguments: [coinType],
-    arguments: [
-      tx.object(eventId),
-      tx.object(marketId),
-      tx.object(storkState),
-      tx.object('0x6'), // Clock
-    ],
-  });
+  const content = event.data.content as any;
+  const fields = content.fields;
   
-  return tx;
+  return {
+    status: fields.status, // 3 = RESOLVED
+    winningOutcome: fields.winning_outcome,
+    oraclePriceAtResolution: fields.oracle_price_at_resolution,
+    resolvedAt: fields.resolved_at,
+  };
 }
+
+// Listen for resolution events
+client.subscribeEvent({
+  filter: {
+    MoveEventType: `${PACKAGE_ID}::blink_event::EventResolved`,
+  },
+  onMessage: (event) => {
+    const { event_id, winning_outcome, oracle_price } = event.parsedJson;
+    console.log('Event resolved:', {
+      eventId: event_id,
+      winningOutcome: winning_outcome,
+      oraclePrice: oracle_price,
+    });
+  },
+});
 ```
+
+**For manual event resolution (sports, politics), see function above.**
+
+**Backend keeper setup:** See [backend/keeper/README.md](../backend/keeper/README.md)
 
 ---
 
@@ -809,48 +828,72 @@ async function claimWinningsFlow(positionId: string) {
 }
 ```
 
-### Oracle: Resolve Crypto Event Flow
+### Crypto Event Resolution (Handled by Backend Keeper)
+
+**⚠️ Crypto events are automatically resolved by the backend keeper service.**
+
+**Frontend should monitor resolution status:**
 
 ```typescript
-async function oracleResolveCryptoEvent(eventId: string) {
-  // 1. Fetch latest price from Stork API
-  const storkResponse = await fetch('https://rest.jp.stork-oracle.network/v1/evm/update_data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      temporalNumericValues: [{
-        id: STORK_FEED_IDS.BTCUSD,
-        timestamp: Math.floor(Date.now() / 1000),
-      }],
-    }),
+async function monitorCryptoEventResolution(eventId: string) {
+  // Poll event status
+  const checkStatus = setInterval(async () => {
+    const event = await client.getObject({
+      id: eventId,
+      options: { showContent: true },
+    });
+    
+    const fields = (event.data.content as any).fields;
+    
+    if (fields.status === 3) { // RESOLVED
+      clearInterval(checkStatus);
+      
+      console.log('Event resolved:', {
+        eventId,
+        winningOutcome: fields.winning_outcome,
+        oraclePrice: fields.oracle_price_at_resolution,
+        resolvedAt: fields.resolved_at,
+      });
+      
+      // Notify UI to refresh
+      notifyEventResolved(eventId, fields.winning_outcome);
+    }
+  }, 2000); // Check every 2 seconds
+}
+
+// Or use WebSocket subscription for real-time updates
+async function subscribeToEventResolution(eventId: string) {
+  const unsubscribe = await client.subscribeEvent({
+    filter: {
+      MoveEventType: `${PACKAGE_ID}::blink_event::EventResolved`,
+    },
+    onMessage: (event) => {
+      const data = event.parsedJson as any;
+      
+      if (data.event_id === eventId) {
+        console.log('Event resolved:', {
+          eventId: data.event_id,
+          winningOutcome: data.winning_outcome,
+          oraclePrice: data.oracle_price,
+          totalPool: data.total_pool,
+        });
+        
+        // Update UI
+        notifyEventResolved(eventId, data.winning_outcome);
+        unsubscribe();
+      }
+    },
   });
   
-  const storkData = await storkResponse.json();
-  
-  // 2. Build resolution PTB
-  const tx = await resolveCryptoEvent(
-    eventId,
-    marketId,
-    STORK_STATE,
-    storkData.encoded_data,
-    coinType
-  );
-  
-  // 3. Execute
-  const result = await client.signAndExecuteTransactionBlock({
-    transactionBlock: tx,
-    signer: oracleKeypair,
-    options: { showEvents: true },
-  });
-  
-  // 4. Extract resolution details from events
-  const resolvedEvent = result.events?.find(
-    (e) => e.type.includes('EventResolved')
-  );
-  
-  console.log('Event resolved:', resolvedEvent?.parsedJson);
+  return unsubscribe;
 }
 ```
+
+**Backend keeper service:**
+- Monitors pending crypto events
+- Fetches signed price data from Stork API (with authentication)
+- Executes atomic PTB (update price + resolve)
+- See [backend/keeper/README.md](../backend/keeper/README.md) for setup
 
 ---
 

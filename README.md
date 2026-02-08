@@ -28,6 +28,7 @@
 - [Fee Structure](#fee-structure)
 - [State Machine](#state-machine)
 - [Security Model](#security-model)
+- [Backend Keeper Service](#backend-keeper-service)
 - [Quick Start](#quick-start)
 - [Testing](#testing)
 - [Deployment](#deployment)
@@ -610,6 +611,101 @@ assert!(
 6. **Mark resolved** (LOCKED → RESOLVED)
 
 All steps execute in **single transaction** — no intermediate states visible to other transactions.
+
+---
+
+## Backend Keeper Service
+
+For **automated crypto event resolution**, the protocol requires a **backend keeper service** that monitors events and handles Stork Oracle integration.
+
+### Why Backend Keeper?
+
+**Crypto events cannot be resolved directly from frontend** because:
+1. ❌ **Stork API requires authentication** (API keys)
+2. ❌ **Price updates must be signed** by authorized oracle
+3. ❌ **Atomic PTB execution** needed (update + resolve)
+4. ❌ **Security**: Oracle private keys must not be exposed to frontend
+
+### Keeper Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│              Backend Keeper Service                  │
+├─────────────────────────────────────────────────────┤
+│                                                       │
+│  1. Monitor blockchain ─────→ Query pending events  │
+│  2. Fetch Stork prices ─────→ Authenticate with API │
+│  3. Build PTB ──────────────→ Update price + Resolve │
+│  4. Execute transaction ────→ Sign with oracle key  │
+│  5. Verify result ──────────→ Log and monitor       │
+│                                                       │
+└─────────────────────────────────────────────────────┘
+            │                            │
+            ▼                            ▼
+      Sui Network              Stork Oracle API
+```
+
+### Key Features
+
+- 🔄 **Automatic monitoring**: Polls blockchain every 3 seconds
+- 📦 **Batch processing**: Groups events for efficient resolution
+- 🔒 **Distributed locks**: Redis prevents duplicate resolutions
+- 📊 **Monitoring**: Prometheus metrics + Grafana dashboards
+- ⚡ **PTB atomicity**: Updates Stork price and resolves in single transaction
+- 🛡️ **Error recovery**: Retry logic with exponential backoff
+
+### Resolution Flow
+
+```typescript
+// Backend keeper executes this PTB atomically:
+
+const tx = new TransactionBlock();
+
+// Step 1: Update Stork price feed with signed data
+tx.moveCall({
+  target: `${STORK_PACKAGE}::stork::update_single_temporal_numeric_value_evm`,
+  arguments: [storkState, signedPriceData, feeCoin],
+});
+
+// Step 2: Resolve event (reads fresh price immediately)
+tx.moveCall({
+  target: `${PACKAGE}::blink_event::resolve_crypto_event`,
+  typeArguments: [coinType],
+  arguments: [eventId, marketId, storkState, clock],
+});
+
+// Execute atomically
+await client.signAndExecuteTransactionBlock({
+  transactionBlock: tx,
+  signer: oracleKeypair,
+});
+```
+
+### Deployment
+
+**See [backend/keeper/README.md](backend/keeper/README.md) for:**
+- Installation and configuration
+- Environment setup
+- Docker deployment
+- Monitoring and troubleshooting
+- Security best practices
+
+**Quick Start:**
+```bash
+cd backend/keeper
+npm install
+cp .env.example .env
+# Edit .env with your credentials
+npm run dev
+```
+
+**Docker Deployment:**
+```bash
+cd backend/keeper
+docker-compose up -d
+```
+
+**Manual events** (sports, politics) still require manual oracle resolution via frontend/admin interface.
 
 ---
 
