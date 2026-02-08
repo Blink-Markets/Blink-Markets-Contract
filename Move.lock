@@ -2,7 +2,30 @@
 # This file should be checked in.
 
 [move]
-version = 4
+version = 3
+manifest_digest = "11571FAD97934CB8A3990ADC5095E4FC7B0BE473467B7C4B1E8D037893F71271"
+deps_digest = "397E6A9F7A624706DBDFEE056CE88391A15876868FD18A88504DA74EB458D697"
+dependencies = [
+  { id = "Bridge", name = "Bridge" },
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+  { id = "stork", name = "stork" },
+]
+
+[[move.package]]
+id = "Bridge"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "9a4d4016ba66c646c76c4b8d54fa9e767f240ab1", subdir = "crates/sui-framework/packages/bridge" }
+
+dependencies = [
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+  { id = "SuiSystem", name = "SuiSystem" },
+]
+
+[[move.package]]
+id = "MoveStdlib"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "9a4d4016ba66c646c76c4b8d54fa9e767f240ab1", subdir = "crates/sui-framework/packages/move-stdlib" }
 
 [pinned.testnet.MoveStdlib]
 source = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "563c15820b27dec9cbe75f826a3b6243ef44da1a" }
@@ -10,14 +33,62 @@ use_environment = "testnet"
 manifest_digest = "C4FE4C91DE74CBF223B2E380AE40F592177D21870DC2D7EB6227D2D694E05363"
 deps = {}
 
+[[move.package]]
+id = "Sui"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "9a4d4016ba66c646c76c4b8d54fa9e767f240ab1", subdir = "crates/sui-framework/packages/sui-framework" }
+
+dependencies = [
+  { id = "MoveStdlib", name = "MoveStdlib" },
+]
+
+[pinned.testnet.MoveStdlib_1]
+source = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "495cc2d57e4bcf77b1c9d6d620a25e93944e584d" }
+use_environment = "testnet"
+manifest_digest = "C4FE4C91DE74CBF223B2E380AE40F592177D21870DC2D7EB6227D2D694E05363"
+deps = {}
+
+[[move.package]]
+id = "SuiSystem"
+source = { git = "https://github.com/MystenLabs/sui.git", rev = "9a4d4016ba66c646c76c4b8d54fa9e767f240ab1", subdir = "crates/sui-framework/packages/sui-system" }
+
+dependencies = [
+  { id = "MoveStdlib", name = "MoveStdlib" },
+  { id = "Sui", name = "Sui" },
+]
+
 [pinned.testnet.Sui]
 source = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "563c15820b27dec9cbe75f826a3b6243ef44da1a" }
 use_environment = "testnet"
 manifest_digest = "7AFB66695545775FBFBB2D3078ADFD084244D5002392E837FDE21D9EA1C6D01C"
 deps = { MoveStdlib = "MoveStdlib" }
 
+[[move.package]]
+id = "stork"
+source = { git = "https://github.com/stork-oracle/stork-external.git", rev = "main", subdir = "chains/sui/contracts" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+]
+
+[move.toolchain-version]
+compiler-version = "1.61.1"
+edition = "2024.beta"
+flavor = "sui"
+
+[pinned.testnet.Sui_1]
+source = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "495cc2d57e4bcf77b1c9d6d620a25e93944e584d" }
+use_environment = "testnet"
+manifest_digest = "7AFB66695545775FBFBB2D3078ADFD084244D5002392E837FDE21D9EA1C6D01C"
+deps = { MoveStdlib = "MoveStdlib_1" }
+
 [pinned.testnet.blinkmarket]
 source = { root = true }
 use_environment = "testnet"
-manifest_digest = "5745706258F61D6CE210904B3E6AE87A73CE9D31A6F93BE4718C442529332A87"
-deps = { std = "MoveStdlib", sui = "Sui" }
+manifest_digest = "54CA1F068AE7DC9A9A563BA17BD18E319A7FBD3DA530E7A512AC904A720A423E"
+deps = { std = "MoveStdlib", stork = "stork", sui = "Sui" }
+
+[pinned.testnet.stork]
+source = { git = "https://github.com/stork-oracle/stork-external.git", subdir = "chains/sui/contracts", rev = "0d2cddb2a7a034ca6833b4fd2f0346665e512408" }
+use_environment = "testnet"
+manifest_digest = "619EA7B17F00D284C8FDB7AC59F5DCC495E4692770612925E52C769D99687B69"
+deps = { Sui = "Sui_1" }

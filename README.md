@@ -1,492 +1,905 @@
 # Blinkmarket
 
-A high-speed micro-prediction market protocol built on Sui blockchain for ultra-fast betting on micro-events.
+<div align="center">
+
+**High-Speed Micro-Prediction Market Protocol on Sui Blockchain**
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Sui Move](https://img.shields.io/badge/Sui-Move-blue)](https://sui.io)
+[![Tests](https://img.shields.io/badge/tests-46%20passing-brightgreen)](tests/)
+
+*Real-time prediction markets for sports, crypto prices, and custom events with instant settlement and parimutuel pooling*
+
+[Quick Start](#quick-start) • [Documentation](#documentation) • [API Reference](FRONTEND_API.md) • [Examples](#examples)
+
+</div>
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Core Concepts](#core-concepts)
+- [Pool Mathematics](#pool-mathematics)
+- [Event Types](#event-types)
+- [Contract Design](#contract-design)
+- [Fee Structure](#fee-structure)
+- [State Machine](#state-machine)
+- [Security Model](#security-model)
+- [Quick Start](#quick-start)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Examples](#examples)
+- [Contributing](#contributing)
+
+---
 
 ## Overview
 
-Blinkmarket enables real-time prediction markets for micro-events — short-lived, rapidly-resolved events that demand instant participation and settlement. Built on Sui's object-centric model, it uses parimutuel pooling for automatic odds calculation and Position NFTs for composable stake management.
+**Blinkmarket** is a decentralized prediction market protocol built on the Sui blockchain, enabling ultra-fast betting on micro-events through **parimutuel pooling** and **oracle-based resolution**. The protocol supports two distinct event types:
+
+1. **Manual Events** — Sports betting, political predictions, custom markets (2-10 outcomes)
+2. **Crypto Events** — Automated price predictions using Stork oracle feeds (binary: Above/Below)
+
+Built with Sui's **object-centric model**, Blinkmarket leverages:
+- ✅ **Generic coin types** — Support SUI, USDC, and any custom tokens
+- ✅ **NFT positions** — Composable stake management via Position objects
+- ✅ **Atomic oracle resolution** — Price feed updates and event settlement in single PTB
+- ✅ **Parimutuel mathematics** — Automatic odds calculation and proportional payouts
+- ✅ **Multi-market support** — Independent markets with separate treasuries and fee structures
+
+---
+
+## Features
+
+### For Users
+- 🎯 **Prediction Markets** — Bet on sports, crypto prices, politics, custom events
+- ⚡ **Instant Settlement** — Claim winnings immediately after resolution
+- 💰 **Fair Odds** — Parimutuel pooling eliminates house edge
+- 🎨 **NFT Positions** — Tradable, transferable betting positions
+- 🔄 **Multi-Coin Support** — Use SUI, USDC, or any token
+- 🚫 **Bet Cancellation** — Cancel bets before event locks (1% fee)
+- 💸 **Full Refunds** — Get stake back if event is cancelled
+
+### For Creators
+- 🏗️ **Custom Markets** — Create prediction markets for any niche
+- 🎛️ **Flexible Configuration** — Set min/max stakes, platform fees
+- 📊 **Oracle Integration** — Automated resolution via Stork price feeds
+- 🔐 **Access Control** — Admin capabilities and oracle authorization
+- 💵 **Revenue Streams** — Collect platform fees in any coin type
+
+### For Developers
+- 🧩 **Modular Design** — Three independent modules (config, event, position)
+- 🔢 **Generic Types** — Full type safety with generic coin parameters
+- 📜 **Rich Events** — Comprehensive on-chain event emission
+- 🛠️ **View Functions** — Extensive read-only query interface
+- ✅ **Tested** — 46 comprehensive unit tests
+- 📚 **Documented** — Complete API reference and integration guide
+
+---
 
 ## Architecture
 
-The protocol consists of three independent modules:
+### Module Structure
+
+The protocol is split into three independent Move modules:
 
 ```
-blink_config    → Governance, treasury, market configuration
-blink_event     → Event lifecycle, oracle resolution, pool mechanics
-blink_position  → User actions, betting, claims
+┌─────────────────────────────────────────────────────────────┐
+│                       Blinkmarket Protocol                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │  blink_config   │  │   blink_event   │  │blink_position││
+│  │                 │  │                 │  │             │ │
+│  │ • AdminCap      │  │ • Event CRUD    │  │ • Place bet │ │
+│  │ • Market        │  │ • State machine │  │ • Cancel bet│ │
+│  │ • Treasury<T>   │  │ • Resolution    │  │ • Claim     │ │
+│  │ • Oracle auth   │  │ • Pool logic    │  │ • Refund    │ │
+│  │ • Fee config    │  │ • Oracle price  │  │ • Position  │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
+│         ↓                     ↓                    ↓         │
+│    Governance            Event Lifecycle        User Actions │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Event State Machine
+### Object Model
 
 ```
-CREATED (0) → OPEN (1) → LOCKED (2) → RESOLVED (3)
-                ↓            ↓
-             CANCELLED (4) ←─┘
+                    ┌──────────────┐
+                    │   AdminCap   │ (owned)
+                    └──────┬───────┘
+                           │ controls
+    ┌──────────────────────┼──────────────────────┐
+    │                      │                      │
+    ▼                      ▼                      ▼
+┌─────────┐       ┌───────────────┐      ┌──────────────┐
+│ Market  │◄──────┤MarketCreatorCap│      │Treasury<CT> │(shared)
+│(shared) │       │    (owned)     │      │  (shared)   │
+└────┬────┘       └───────┬────────┘      └──────────────┘
+     │ contains           │ creates
+     │ oracles            │ events
+     ▼                    ▼
+┌────────────────────────────────┐
+│   PredictionEvent<CoinType>    │ (shared)
+│                                 │
+│  • Outcome pools (Balance<CT>) │
+│  • Event type (manual/crypto)  │
+│  • Oracle data (feed_id, price)│
+│  • State (created→open→resolved)│
+└────────────┬────────────────────┘
+             │ users bet on
+             ▼
+    ┌───────────────────┐
+    │  Position<CT>     │ (owned by user)
+    │                   │
+    │  • Stake amount   │
+    │  • Outcome index  │
+    │  • Is claimed     │
+    └───────────────────┘
 ```
 
-### Payout Mechanics (Parimutuel)
+---
+
+## Core Concepts
+
+### 1. Generic Coin Types
+
+All core structures are **generic over coin type**, enabling multi-currency support:
+
+```move
+public struct Treasury<phantom CoinType> has key { ... }
+public struct PredictionEvent<CoinType> has key, store { ... }
+public struct Position<CoinType> has key, store { ... }
+```
+
+**Example:**
+- `PredictionEvent<SUI>` — Event denominated in SUI
+- `PredictionEvent<USDC>` — Event denominated in USDC
+- `Position<SUI>` — Position holding SUI stake
+
+### 2. Parimutuel Pooling
+
+Unlike traditional bookmakers, Blinkmarket uses **parimutuel pooling**, where:
+
+- All bets on the same outcome go into a shared pool
+- Losers' stakes are distributed to winners proportionally
+- No house edge — only a small platform fee (e.g., 2%)
+
+**Benefits:**
+- ✅ Fair odds determined by market participation
+- ✅ No counterparty risk (protocol can't lose)
+- ✅ Scales to any bet size without liquidity concerns
+
+### 3. Position NFTs
+
+When users place a bet, they receive a **Position object** (NFT):
+
+```move
+public struct Position<phantom CoinType> has key, store {
+    id: UID,
+    event_id: ID,
+    outcome_index: u8,
+    stake_amount: u64,
+    is_claimed: bool,
+    owner: address,
+}
+```
+
+**Capabilities:**
+- ✅ **Tradable** — Sell your position to others
+- ✅ **Transferable** — Gift or move between wallets
+- ✅ **Composable** — Use in DeFi protocols as collateral
+- ✅ **Verifiable** — Query on-chain for ownership proof
+
+### 4. Oracle Integration
+
+**Manual Events:** Authorized oracles manually set winning outcome  
+**Crypto Events:** Automated via [Stork oracle](https://stork.network/) price feeds
+
+**Supported Assets:**
+- BTC/USD
+- ETH/USD
+- SOL/USD
+- SUI/USD
+
+---
+
+## Pool Mathematics
+
+### Parimutuel Payout Formula
 
 ```
-Total Pool = Sum of all outcome pools (net of platform fees)
-Payout = (user_stake / winning_pool) × total_pool
+total_pool = sum of all outcome pools (after platform fees)
+winning_pool = pool for winning outcome (before losing pools merged)
+
+payout = (user_stake / winning_pool_at_resolution) × total_pool
+```
+
+### Example Calculation
+
+**Scenario:**
+- User A bets **100 SUI** on YES → net stake: **98 SUI** (2% fee)
+- User B bets **200 SUI** on YES → net stake: **196 SUI**
+- User C bets **300 SUI** on NO → net stake: **294 SUI**
+
+**Pools before resolution:**
+```
+YES pool:   98 + 196 = 294 SUI
+NO pool:    294 SUI
+Total pool: 588 SUI
+```
+
+**If YES wins:**
+```
+Winning pool (at resolution): 294 SUI (YES pool before merge)
+Total pool (after merge):     588 SUI (all pools combined)
+
+User A payout: (98 / 294) × 588 = 196 SUI
+User B payout: (196 / 294) × 588 = 392 SUI
+Total payouts: 196 + 392 = 588 SUI ✅
+```
+
+### Key Properties
+
+1. **Conservation of Pool:**
+   ```
+   sum(all_payouts) = total_pool
+   ```
+
+2. **Proportional Distribution:**
+   ```
+   user_share = user_stake / winning_pool
+   user_payout = user_share × total_pool
+   ```
+
+3. **Winner-Takes-All:**
+   - Losing outcome pools have balance = 0 after resolution
+   - All funds transferred to winning pool
+
+4. **Overflow Protection:**
+   - Uses `u128` arithmetic for intermediate calculations
+   - Prevents overflow even with large stakes
+
+### Odds Calculation
+
+**Implied odds** can be calculated from pool sizes:
+
+```
+implied_probability = outcome_pool / total_pool
+decimal_odds = total_pool / outcome_pool
 ```
 
 **Example:**
 ```
-YES pool: 40 SUI, NO pool: 60 SUI → Total: 100 SUI
-If YES wins → Each 1 SUI on YES returns 2.5 SUI (100/40)
-If NO wins  → Each 1 SUI on NO returns 1.67 SUI (100/60)
+YES pool: 300 SUI
+NO pool:  700 SUI
+Total:    1000 SUI
+
+YES implied probability: 300 / 1000 = 30%
+YES decimal odds:        1000 / 300 = 3.33x
+
+NO implied probability:  700 / 1000 = 70%
+NO decimal odds:         1000 / 700 = 1.43x
 ```
+
+**Note:** These are **dynamic odds** that change with each new bet.
+
+---
+
+## Event Types
+
+### 1. Manual Events
+
+**Characteristics:**
+- **Outcomes:** 2-10 custom labels (e.g., "Team A", "Team B", "Draw")
+- **Resolution:** Oracle manually sets winning outcome
+- **Use cases:** Sports, politics, entertainment, custom markets
+
+**Function:**
+```move
+public fun create_manual_event<CoinType>(
+    creator_cap: &MarketCreatorCap,
+    market: &Market,
+    description: vector<u8>,
+    outcome_labels: vector<vector<u8>>, // 2-10 labels
+    duration: u64,                       // in milliseconds
+    ctx: &mut TxContext,
+)
+```
+
+**Resolution:**
+```move
+public fun resolve_manual_event<CoinType>(
+    prediction_event: &mut PredictionEvent<CoinType>,
+    market: &Market,
+    winning_outcome: u8,  // Oracle picks winner
+    clock: &Clock,
+    ctx: &mut TxContext,
+)
+```
+
+### 2. Crypto Events
+
+**Characteristics:**
+- **Outcomes:** Always binary — `["Above", "Below"]`
+- **Resolution:** Automated via Stork oracle price feed
+- **Use cases:** BTC > $60k? ETH > $3k? SOL > $100?
+
+**Function:**
+```move
+public fun create_crypto_event<CoinType>(
+    creator_cap: &MarketCreatorCap,
+    market: &Market,
+    description: vector<u8>,
+    oracle_feed_id: vector<u8>,  // 32-byte Stork feed ID
+    target_price: u128,           // Price threshold (18 decimals)
+    duration: u64,
+    ctx: &mut TxContext,
+)
+```
+
+**Resolution:**
+```move
+public fun resolve_crypto_event<CoinType>(
+    prediction_event: &mut PredictionEvent<CoinType>,
+    market: &Market,
+    stork_state: &StorkState,  // Stork oracle state
+    clock: &Clock,
+    ctx: &mut TxContext,
+)
+```
+
+**Logic:**
+```
+oracle_price = read_from_stork(feed_id)
+winning_outcome = if oracle_price >= target_price { 0 } else { 1 }
+                  // 0 = "Above", 1 = "Below"
+```
+
+**Atomic Resolution:**
+Backend keeper executes in **single PTB**:
+1. `stork::update_temporal_numeric_value()` — Push latest signed price
+2. `blink_event::resolve_crypto_event()` — Read price and resolve atomically
+
+---
+
+## Contract Design
+
+### Event State Machine
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Event Lifecycle                         │
+└─────────────────────────────────────────────────────────────┘
+
+   ┌──────────┐
+   │ CREATED  │ (0) — Event initialized, not yet open for bets
+   └────┬─────┘
+        │ open_event()
+        ▼
+   ┌──────────┐
+   │   OPEN   │ (1) — Betting window active
+   └────┬─────┘
+        │
+        ├─────────────────┐
+        │                 │ cancel_event()
+        │                 ▼
+        │            ┌──────────┐
+        │            │CANCELLED │ (4) — Event cancelled, refunds enabled
+        │            └──────────┘
+        │
+        │ resolve_manual_event() OR resolve_crypto_event()
+        │ (auto-locks internally)
+        ▼
+   ┌──────────┐
+   │ LOCKED   │ (2) — [Transient state during resolution]
+   └────┬─────┘
+        │ (immediate)
+        ▼
+   ┌──────────┐
+   │ RESOLVED │ (3) — Resolution complete, claims enabled
+   └──────────┘
+```
+
+**State Transitions:**
+- `CREATED → OPEN` — Market creator opens event
+- `OPEN → CANCELLED` — Market creator cancels event
+- `OPEN → LOCKED → RESOLVED` — Oracle resolves (atomic)
+
+**Key Design Decision:**
+- ❌ **No external `lock_event` function** (removed)
+- ✅ **Auto-lock during resolution** (atomic state transition)
+- ✅ **Minimizes timing attacks** and race conditions
+
+### Module Responsibilities
+
+#### `blink_config` — Governance & Configuration
+
+**Capabilities:**
+```move
+public struct AdminCap has key, store { ... }
+public struct MarketCreatorCap has key, store { ... }
+```
+
+**Functions:**
+- `create_market()` — Create new market category
+- `create_treasury<CoinType>()` — Initialize treasury for coin type
+- `add_oracle()` / `remove_oracle()` — Manage authorized oracles
+- `set_market_active()` — Enable/disable market
+- `withdraw_fees<CoinType>()` — Admin withdraw treasury balance
+
+#### `blink_event` — Event Lifecycle & Resolution
+
+**Core Functions:**
+- `create_manual_event<CoinType>()`
+- `create_crypto_event<CoinType>()`
+- `open_event<CoinType>()`
+- `cancel_event<CoinType>()`
+- `resolve_manual_event<CoinType>()`
+- `resolve_crypto_event<CoinType>()`
+
+**Package-Internal Functions:**
+- `add_to_pool()` — Add stake to outcome pool
+- `remove_from_pool()` — Remove stake (for cancellations)
+- `withdraw_payout()` — Withdraw winnings (for claims)
+
+**View Functions:**
+- `get_odds()` — Get pool balances
+- `get_total_pool()` — Get total pool size
+- `calculate_potential_payout()` — Calculate expected return
+- `is_betting_open()` — Check if betting window active
+- `get_event_type()` / `get_oracle_feed_id()` / `get_target_price()`
+
+#### `blink_position` — User Actions
+
+**Functions:**
+- `place_bet<CoinType>()` → Returns `Position<CoinType>`
+- `cancel_bet<CoinType>()` → Returns `Coin<CoinType>` (refund)
+- `claim_winnings<CoinType>()` → Returns `Coin<CoinType>` (payout)
+- `claim_refund<CoinType>()` → Returns `Coin<CoinType>` (full refund)
+
+**View Functions:**
+- `get_position_stake()` / `get_position_outcome()`
+- `is_position_claimed()` / `get_position_owner()`
+
+---
 
 ## Fee Structure
 
-| Fee Type | Rate | Destination |
-|----------|------|-------------|
-| Platform Fee | Configurable per market (basis points, e.g. 200 = 2%) | Treasury (shared object) |
-| Cancellation Fee | 1% (100 basis points) | Stays in outcome pool |
+### Platform Fee
 
-## On-chain Objects
+- **Charged on:** Bet placement
+- **Rate:** Configurable per market (basis points, e.g., 200 = 2%)
+- **Destination:** `Treasury<CoinType>` (shared object)
 
-| Object | Type | Description |
-|--------|------|-------------|
-| `AdminCap` | Owned | Root admin capability, created at init |
-| `MarketCreatorCap` | Owned | Scoped capability for creating events in a market |
-| `Market` | Shared | Market category config (min/max stake, fee, oracles) |
-| `Treasury` | Shared | Platform fee collection |
-| `PredictionEvent` | Shared | Event with outcome pools, status, timestamps |
-| `Position` | Owned | User's stake on a specific outcome (NFT) |
+**Calculation:**
+```move
+let fee_amount = (stake_value * market.platform_fee_bps) / 10000;
+let net_stake = stake_value - fee_amount;
+```
 
-## Frontend Integration Guide
+**Example:**
+```
+Stake:         100 SUI
+Platform fee:  2% (200 bps)
+Fee amount:    2 SUI
+Net stake:     98 SUI → Goes to outcome pool
+```
 
-### Object IDs You Need
+### Cancellation Fee
 
-After deployment, record the following object IDs:
-- **Package ID**: The published package address
-- **AdminCap ID**: Owned by deployer (from `init`)
-- **Treasury ID**: Shared object (from `init`)
-- **Market ID**: Shared object (from `create_market`)
-- **MarketCreatorCap ID**: Owned by admin (from `create_market`)
+- **Charged on:** Bet cancellation (before event locked)
+- **Rate:** 1% (100 basis points) — hardcoded
+- **Destination:** Remains in outcome pool (distributed to winners)
 
-### Transaction Building
+**Calculation:**
+```move
+let cancellation_fee = (stake_amount * 100) / 10000;
+let refund_amount = stake_amount - cancellation_fee;
+```
 
-All examples use the [Sui TypeScript SDK](https://sdk.mystenlabs.com/typescript).
+**Example:**
+```
+Original stake: 98 SUI (net after platform fee)
+Cancellation:   1% fee
+Fee amount:     0.98 SUI → Stays in pool
+Refund:         97.02 SUI → Returned to user
+```
+
+### No Withdrawal Fees
+
+- ❌ No fee on claiming winnings
+- ❌ No fee on claiming refunds (if event cancelled)
 
 ---
 
-### 1. Admin: Create a Market
+## State Machine
 
-**Function:** `blink_config::create_market`
+### Event Status Code Mapping
 
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_config::create_market`,
-  arguments: [
-    tx.object(ADMIN_CAP_ID),             // &AdminCap
-    tx.pure.vector('u8', [...new TextEncoder().encode('NBA')]),  // name
-    tx.pure.vector('u8', [...new TextEncoder().encode('NBA Basketball')]),  // description
-    tx.pure.u64(1_000_000),              // min_stake (0.001 SUI in MIST)
-    tx.pure.u64(1_000_000_000),          // max_stake (1 SUI in MIST)
-    tx.pure.u64(200),                    // platform_fee_bps (2%)
-  ],
-});
-// Returns: MarketCreatorCap (owned object)
-// Side effect: creates shared Market object
+| Code | Status | Description |
+|------|--------|-------------|
+| 0 | CREATED | Event initialized, betting not started |
+| 1 | OPEN | Betting window active |
+| 2 | LOCKED | Event locked for resolution (transient) |
+| 3 | RESOLVED | Resolution complete, claims enabled |
+| 4 | CANCELLED | Event cancelled, refunds enabled |
+
+### Betting Time Window
+
+Events have **fixed duration** set at creation:
+
+```move
+prediction_event.betting_start_time = clock::timestamp_ms(clock);
+prediction_event.betting_end_time = start + duration;
 ```
 
-### 2. Admin: Add Oracle
-
-**Function:** `blink_config::add_oracle`
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_config::add_oracle`,
-  arguments: [
-    tx.object(ADMIN_CAP_ID),             // &AdminCap
-    tx.object(MARKET_ID),                // &mut Market
-    tx.pure.address(ORACLE_ADDRESS),     // oracle address
-  ],
-});
+**Validation:**
+```move
+current_time >= betting_start_time  // EBettingNotStarted
+current_time < betting_end_time     // EBettingClosed
 ```
 
-### 3. Admin: Remove Oracle
+### Resolution Timing
 
-**Function:** `blink_config::remove_oracle`
+Resolution **only allowed** after betting window closes:
 
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_config::remove_oracle`,
-  arguments: [
-    tx.object(ADMIN_CAP_ID),
-    tx.object(MARKET_ID),
-    tx.pure.address(ORACLE_ADDRESS),
-  ],
-});
-```
-
-### 4. Admin: Set Market Active/Inactive
-
-**Function:** `blink_config::set_market_active`
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_config::set_market_active`,
-  arguments: [
-    tx.object(ADMIN_CAP_ID),
-    tx.object(MARKET_ID),
-    tx.pure.bool(false),                 // is_active
-  ],
-});
-```
-
-### 5. Creator: Create Event
-
-**Function:** `blink_event::create_event`
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_event::create_event`,
-  arguments: [
-    tx.object(CREATOR_CAP_ID),           // &MarketCreatorCap
-    tx.object(MARKET_ID),                // &Market
-    tx.pure.vector('u8', [...new TextEncoder().encode('Will next shot be a 3-pointer?')]),
-    tx.pure(bcs.vector(bcs.vector(bcs.u8())).serialize([
-      [...new TextEncoder().encode('Yes')],
-      [...new TextEncoder().encode('No')],
-    ])),                                 // outcome_labels: vector<vector<u8>>
-    tx.pure.u64(Date.now()),             // betting_start_time (ms)
-    tx.pure.u64(Date.now() + 30_000),    // betting_end_time (ms)
-  ],
-});
-// Side effect: creates shared PredictionEvent object
-```
-
-### 6. Creator: Open Event
-
-**Function:** `blink_event::open_event`
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_event::open_event`,
-  arguments: [
-    tx.object(CREATOR_CAP_ID),           // &MarketCreatorCap
-    tx.object(EVENT_ID),                 // &mut PredictionEvent
-  ],
-});
-```
-
-### 7. Creator: Lock Event
-
-**Function:** `blink_event::lock_event`
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_event::lock_event`,
-  arguments: [
-    tx.object(CREATOR_CAP_ID),
-    tx.object(EVENT_ID),
-  ],
-});
-```
-
-### 8. Creator: Cancel Event
-
-**Function:** `blink_event::cancel_event`
-
-Can cancel from CREATED, OPEN, or LOCKED states.
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_event::cancel_event`,
-  arguments: [
-    tx.object(CREATOR_CAP_ID),
-    tx.object(EVENT_ID),
-  ],
-});
-```
-
-### 9. Oracle: Resolve Event
-
-**Function:** `blink_event::resolve_event`
-
-Resolves an event by setting the winning outcome. Only callable by authorized oracles when event is LOCKED.
-
-On resolution:
-- All losing outcome pools are merged into the winning pool
-- `resolved_at` timestamp is recorded
-- `winning_pool_at_resolution` is saved for correct payout calculation
-
-```typescript
-const tx = new Transaction();
-tx.moveCall({
-  target: `${PACKAGE_ID}::blink_event::resolve_event`,
-  arguments: [
-    tx.object(EVENT_ID),                 // &mut PredictionEvent
-    tx.object(MARKET_ID),                // &Market
-    tx.pure.u8(0),                       // winning_outcome (index)
-    tx.object('0x6'),                    // Clock (system object)
-  ],
-});
-```
-
-### 10. User: Place Bet
-
-**Function:** `blink_position::place_bet`
-
-```typescript
-const tx = new Transaction();
-const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(100_000_000)]); // 0.1 SUI
-const [position] = tx.moveCall({
-  target: `${PACKAGE_ID}::blink_position::place_bet`,
-  arguments: [
-    tx.object(EVENT_ID),                 // &mut PredictionEvent
-    tx.object(MARKET_ID),                // &Market
-    tx.object(TREASURY_ID),              // &mut Treasury
-    tx.pure.u8(0),                       // outcome_index
-    coin,                                // Coin<SUI>
-    tx.object('0x6'),                    // Clock
-  ],
-});
-tx.transferObjects([position], tx.pure.address(USER_ADDRESS));
-// Returns: Position (owned NFT)
-// Note: stake_amount in Position = input amount - platform fee
-```
-
-### 11. User: Cancel Bet
-
-**Function:** `blink_position::cancel_bet`
-
-Only available while event is OPEN. 1% cancellation fee is deducted.
-
-```typescript
-const tx = new Transaction();
-const [refund] = tx.moveCall({
-  target: `${PACKAGE_ID}::blink_position::cancel_bet`,
-  arguments: [
-    tx.object(EVENT_ID),                 // &mut PredictionEvent
-    tx.object(POSITION_ID),              // Position (consumed)
-  ],
-});
-tx.transferObjects([refund], tx.pure.address(USER_ADDRESS));
-// Returns: Coin<SUI> (refund minus 1% cancellation fee)
-```
-
-### 12. User: Claim Winnings
-
-**Function:** `blink_position::claim_winnings`
-
-Only the position owner (original bettor) can claim. Event must be RESOLVED and position must be on the winning outcome.
-
-```typescript
-const tx = new Transaction();
-const [payout] = tx.moveCall({
-  target: `${PACKAGE_ID}::blink_position::claim_winnings`,
-  arguments: [
-    tx.object(EVENT_ID),                 // &mut PredictionEvent
-    tx.object(POSITION_ID),              // &mut Position
-  ],
-});
-tx.transferObjects([payout], tx.pure.address(USER_ADDRESS));
-// Returns: Coin<SUI> with payout = (user_stake / winning_pool) * total_pool
-```
-
-### 13. User: Claim Refund
-
-**Function:** `blink_position::claim_refund`
-
-Only the position owner can claim. Event must be CANCELLED.
-
-```typescript
-const tx = new Transaction();
-const [refund] = tx.moveCall({
-  target: `${PACKAGE_ID}::blink_position::claim_refund`,
-  arguments: [
-    tx.object(EVENT_ID),                 // &mut PredictionEvent
-    tx.object(POSITION_ID),              // Position (consumed)
-  ],
-});
-tx.transferObjects([refund], tx.pure.address(USER_ADDRESS));
-// Returns: Coin<SUI> (full net stake refund)
-```
-
-### 14. Admin: Withdraw Fees
-
-**Function:** `blink_config::withdraw_fees`
-
-```typescript
-const tx = new Transaction();
-const [withdrawn] = tx.moveCall({
-  target: `${PACKAGE_ID}::blink_config::withdraw_fees`,
-  arguments: [
-    tx.object(ADMIN_CAP_ID),             // &AdminCap
-    tx.object(TREASURY_ID),              // &mut Treasury
-    tx.pure.u64(1_000_000),              // amount to withdraw
-  ],
-});
-tx.transferObjects([withdrawn], tx.pure.address(ADMIN_ADDRESS));
+```move
+assert!(
+    event.status == STATUS_OPEN &&
+    current_time >= event.betting_end_time,
+    EEventNotOpen
+);
 ```
 
 ---
 
-## Read-only (View) Functions
-
-These can be called via `devInspectTransactionBlock` or by reading on-chain object fields directly.
-
-### blink_event
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `get_odds` | `&PredictionEvent` | `vector<u64>` | Pool balances for each outcome |
-| `calculate_potential_payout` | `&PredictionEvent, outcome_index: u8, stake_amount: u64` | `u64` | Estimated payout if this outcome wins |
-| `is_betting_open` | `&PredictionEvent, &Clock` | `bool` | Whether betting window is active |
-| `get_event_status` | `&PredictionEvent` | `u8` | Status code (0–4) |
-| `get_total_pool` | `&PredictionEvent` | `u64` | Total pool value (MIST) |
-| `get_winning_outcome` | `&PredictionEvent` | `u8` | Winning outcome index (only after RESOLVED) |
-| `get_resolved_at` | `&PredictionEvent` | `u64` | Resolution timestamp in ms (only after RESOLVED) |
-
-### blink_position
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `get_position_stake` | `&Position` | `u64` | Net stake amount (after platform fee) |
-| `get_position_outcome` | `&Position` | `u8` | Outcome index the bet is on |
-| `is_position_claimed` | `&Position` | `bool` | Whether winnings have been claimed |
-| `get_position_owner` | `&Position` | `address` | Address of the position owner |
-
-### blink_config
-
-| Function | Parameters | Returns | Description |
-|----------|-----------|---------|-------------|
-| `get_treasury_balance` | `&Treasury` | `u64` | Current treasury balance (MIST) |
-| `get_total_fees_collected` | `&Treasury` | `u64` | Total fees ever collected |
-| `get_market_min_stake` | `&Market` | `u64` | Minimum stake per bet |
-| `get_market_max_stake` | `&Market` | `u64` | Maximum stake per bet |
-| `get_market_fee_bps` | `&Market` | `u64` | Platform fee in basis points |
-| `is_market_active` | `&Market` | `bool` | Whether market accepts new events |
-| `is_oracle` | `&Market, address` | `bool` | Whether address is an authorized oracle |
-
----
-
-## Emitted Events
-
-Subscribe to these events to track on-chain activity in real-time.
-
-| Event Struct | Module | Fields | When Emitted |
-|-------------|--------|--------|-------------|
-| `MarketCreated` | `blink_config` | `market_id: ID`, `name: vector<u8>` | Market created |
-| `EventCreated` | `blink_event` | `event_id: ID`, `market_id: ID`, `description: vector<u8>`, `num_outcomes: u64` | Event created |
-| `EventResolved` | `blink_event` | `event_id: ID`, `winning_outcome: u8`, `total_pool: u64` | Event resolved |
-| `BetPlaced` | `blink_position` | `event_id: ID`, `position_id: ID`, `outcome_index: u8`, `stake_amount: u64`, `bettor: address` | Bet placed |
-| `BetCancelled` | `blink_position` | `event_id: ID`, `position_id: ID`, `refund_amount: u64`, `fee_amount: u64` | Bet cancelled |
-| `WinningsClaimed` | `blink_position` | `event_id: ID`, `position_id: ID`, `payout_amount: u64`, `claimer: address` | Winnings claimed |
-| `RefundClaimed` | `blink_position` | `event_id: ID`, `position_id: ID`, `refund_amount: u64`, `claimer: address` | Refund claimed |
-
----
-
-## Error Codes
-
-| Code | Constant | Module | Description |
-|------|----------|--------|-------------|
-| 0 | `ENotAuthorized` | `blink_config` | Caller not authorized |
-| 1 | (inline) | `blink_event` | Caller is not an oracle |
-| 100 | `EMarketNotActive` | `blink_config` | Market is deactivated |
-| 101 | `EEventNotOpen` | `blink_event` | Event not in expected status |
-| 103 | `EEventNotResolved` | `blink_event` | Event not resolved yet |
-| 104 | `EEventNotCancelled` | `blink_event` | Event not cancelled |
-| 105 | `EPositionAlreadyClaimed` | `blink_position` | Position already claimed |
-| 106 | `ENotWinningOutcome` | `blink_position` | Position is on losing outcome |
-| 107 | `ENotAuthorized` | `blink_position` | Caller is not the position owner |
-| 200 | `EInvalidOutcome` | `blink_event` | Invalid outcome index |
-| 202 | `EStakeTooLow` | `blink_position` | Stake below market minimum |
-| 203 | `EStakeTooHigh` | `blink_position` | Stake above market maximum |
-| 205 | `ETooFewOutcomes` | `blink_event` | Less than 2 outcomes |
-| 206 | `ETooManyOutcomes` | `blink_event` | More than 10 outcomes |
-| 207 | `EEventMismatch` | `blink_event` / `blink_position` | Event/Market/Position ID mismatch |
-| 300 | `EBettingNotStarted` | `blink_event` | Betting window not yet open |
-| 301 | `EBettingClosed` | `blink_event` | Betting window ended |
-| 302 | `EEventAlreadyLocked` | `blink_position` | Cannot cancel bet after lock |
-
----
-
-## Security Features
+## Security Model
 
 ### Access Control
 
-| Operation | Required | Validation |
-|-----------|----------|------------|
-| Create market | `AdminCap` | Capability proof |
-| Add/remove oracle | `AdminCap` | Capability proof |
-| Withdraw fees | `AdminCap` | Capability proof |
-| Create/open/lock/cancel event | `MarketCreatorCap` | Market ID match |
-| Resolve event | Oracle address | `is_oracle()` check |
-| Claim winnings | Position owner | `tx_context::sender(ctx) == position.owner` |
-| Claim refund | Position owner | `tx_context::sender(ctx) == position.owner` |
+| Action | Required Permission |
+|--------|-------------------|
+| Create market | `AdminCap` |
+| Create treasury | `AdminCap` |
+| Add/remove oracle | `AdminCap` |
+| Withdraw fees | `AdminCap` |
+| Create event | `MarketCreatorCap` (for specific market) |
+| Open event | `MarketCreatorCap` |
+| Cancel event | `MarketCreatorCap` |
+| Resolve event | Authorized oracle (via `is_oracle()` check) |
+| Place bet | Anyone (market must be active) |
+| Cancel bet | Position owner (event must be OPEN) |
+| Claim winnings | Position owner (event must be RESOLVED) |
+| Claim refund | Position owner (event must be CANCELLED) |
 
-### Payout Safety
+### Validation Checks
 
-- **u128 arithmetic**: Intermediate payout calculations use `u128` to prevent overflow on large stakes
-- **Pool merge on resolve**: Losing pools are merged into the winning pool at resolution time, ensuring payouts only come from a single consolidated pool
-- **Double-claim prevention**: Position `is_claimed` flag prevents re-claiming
-- **Event-position binding**: All operations verify `position.event_id == event.id`
+**Bet Placement:**
+- ✅ Market is active
+- ✅ Event is OPEN
+- ✅ Current time within betting window
+- ✅ Stake >= market minimum
+- ✅ Stake <= market maximum
+- ✅ Valid outcome index
+
+**Resolution:**
+- ✅ Caller is authorized oracle
+- ✅ Event is OPEN
+- ✅ Betting time expired
+- ✅ (Crypto) Event type matches
+- ✅ (Manual) Valid winning outcome
+
+**Claims:**
+- ✅ Caller owns Position
+- ✅ Event is RESOLVED
+- ✅ Position outcome matches winning outcome
+- ✅ Position not already claimed
+
+### Atomic Operations
+
+**Resolution is atomic:**
+1. Check permissions
+2. **Lock event** (OPEN → LOCKED)
+3. Read oracle price (for crypto)
+4. Determine winner
+5. Merge losing pools into winning pool
+6. **Mark resolved** (LOCKED → RESOLVED)
+
+All steps execute in **single transaction** — no intermediate states visible to other transactions.
 
 ---
 
-## Build & Test
+## Quick Start
+
+### Prerequisites
 
 ```bash
+# Install Sui CLI
+cargo install --locked --git https://github.com/MystenLabs/sui.git --branch mainnet sui
+
+# Verify installation
+sui --version
+```
+
+### Build Contract
+
+```bash
+# Clone repository
+git clone https://github.com/Blink-Markets/Blink-Markets-Contract.git
+cd Blink-Markets-Contract
+
 # Build
 sui move build
 
-# Run all tests (34 tests)
+# Run tests
 sui move test
-
-# Build in dev mode
-sui move build -d
 ```
 
-## Deployment
+### Deploy
 
 ```bash
-# Publish to network
-sui client publish
+# Deploy to testnet
+sui client publish --gas-budget 100000000
 
-# Record deployed package address and object IDs
-sui move manage-package
+# Save package ID and shared object IDs
+export PACKAGE_ID=0x...
+export MARKET_ID=0x...
+export TREASURY_SUI=0x...
 ```
 
 ---
 
-## Typical Flow
+## Testing
+
+### Test Coverage
+
+**46 comprehensive unit tests** covering:
+
+- ✅ Initialization & market creation
+- ✅ Oracle authorization
+- ✅ Manual event creation & resolution
+- ✅ Crypto event creation & resolution (with test-only oracle mock)
+- ✅ Bet placement (valid & invalid stakes)
+- ✅ Bet cancellation (before & after lock)
+- ✅ Winning claims (single & multiple winners)
+- ✅ Refund claims (cancelled events)
+- ✅ Access control (oracle, position owner)
+- ✅ Edge cases (overflow protection, equal stakes, large values)
+- ✅ Generic treasury creation
+
+### Run Tests
+
+```bash
+# Run all tests
+sui move test
+
+# Run specific test
+sui move test test_full_betting_resolution_and_claim
+
+# Run with verbose output
+sui move test --verbose
+```
+
+### Test Results
 
 ```
-1. Admin creates Market       → Market (shared), MarketCreatorCap (owned)
-2. Admin adds Oracle          → Oracle address registered
-3. Creator creates Event      → PredictionEvent (shared, CREATED)
-4. Creator opens Event        → Status → OPEN
-5. Users place bets           → Position NFTs (owned), funds enter pools
-6. Creator locks Event        → Status → LOCKED (no more bets)
-7. Oracle resolves Event      → Status → RESOLVED, losing pools merged
-8. Winners claim payouts      → Coin<SUI> returned proportionally
-   OR
-4b. Creator cancels Event     → Status → CANCELLED
-5b. Users claim refunds       → Full net stake returned
+Test result: OK. Total tests: 46; passed: 46; failed: 0
 ```
 
-## License
+---
 
-This project is open source. License details to be determined.
+## Deployment
+
+### Step 1: Deploy Contract
+
+```bash
+sui client publish --gas-budget 100000000
+```
+
+**Save addresses:**
+- Package ID
+- AdminCap object ID
+- Treasury<SUI> object ID
+- Market object ID(s)
+
+### Step 2: Configure Market
+
+```bash
+# Add oracle
+sui client call \
+  --package $PACKAGE_ID \
+  --module blink_config \
+  --function add_oracle \
+  --args $ADMIN_CAP $MARKET_ID $ORACLE_ADDRESS \
+  --gas-budget 10000000
+```
+
+### Step 3: Create Treasury for Additional Coins
+
+```bash
+# Create USDC treasury
+sui client call \
+  --package $PACKAGE_ID \
+  --module blink_config \
+  --function create_treasury \
+  --type-args $USDC_TYPE \
+  --args $ADMIN_CAP \
+  --gas-budget 10000000
+```
+
+### Step 4: Create Events
+
+See [FRONTEND_API.md](FRONTEND_API.md) for detailed integration examples.
+
+---
+
+## Examples
+
+### Example 1: Sports Betting (Manual Event)
+
+```typescript
+// Create event
+const tx = new TransactionBlock();
+tx.moveCall({
+  target: `${PACKAGE_ID}::blink_event::create_manual_event`,
+  typeArguments: ['0x2::sui::SUI'],
+  arguments: [
+    tx.object(CREATOR_CAP_ID),
+    tx.object(MARKET_ID),
+    tx.pure('Lakers vs Warriors - Who wins?', 'string'),
+    tx.pure(['Lakers', 'Warriors'], 'vector<string>'),
+    tx.pure(7200000, 'u64'), // 2 hours
+  ],
+});
+
+// Open for betting
+tx.moveCall({
+  target: `${PACKAGE_ID}::blink_event::open_event`,
+  typeArguments: ['0x2::sui::SUI'],
+  arguments: [
+    tx.object(CREATOR_CAP_ID),
+    tx.object(EVENT_ID),
+    tx.object('0x6'), // Clock
+  ],
+});
+
+// ... Users place bets ...
+
+// Oracle resolves (Lakers won)
+tx.moveCall({
+  target: `${PACKAGE_ID}::blink_event::resolve_manual_event`,
+  typeArguments: ['0x2::sui::SUI'],
+  arguments: [
+    tx.object(EVENT_ID),
+    tx.object(MARKET_ID),
+    tx.pure(0, 'u8'), // Lakers = outcome 0
+    tx.object('0x6'),
+  ],
+});
+```
+
+### Example 2: Crypto Price Prediction (Automated)
+
+```typescript
+// Create crypto event
+const targetPrice = '62000000000000000000000'; // $62,000 * 10^18
+
+tx.moveCall({
+  target: `${PACKAGE_ID}::blink_event::create_crypto_event`,
+  typeArguments: ['0x2::sui::SUI'],
+  arguments: [
+    tx.object(CREATOR_CAP_ID),
+    tx.object(MARKET_ID),
+    tx.pure('BTC above $62,000 in 1 hour?', 'string'),
+    tx.pure(Array.from(Buffer.from(BTC_FEED_ID.slice(2), 'hex')), 'vector<u8>'),
+    tx.pure(targetPrice, 'u128'),
+    tx.pure(3600000, 'u64'), // 1 hour
+  ],
+});
+
+// Open for betting
+tx.moveCall({
+  target: `${PACKAGE_ID}::blink_event::open_event`,
+  typeArguments: ['0x2::sui::SUI'],
+  arguments: [
+    tx.object(CREATOR_CAP_ID),
+    tx.object(EVENT_ID),
+    tx.object('0x6'),
+  ],
+});
+
+// ... Users place bets ...
+
+// Oracle resolves (automated)
+// Step 1: Update Stork price
+tx.moveCall({
+  target: `${STORK_PACKAGE}::stork::update_single_temporal_numeric_value_evm`,
+  arguments: [
+    tx.object(STORK_STATE),
+    tx.pure(STORK_UPDATE_DATA, 'vector<u8>'),
+    feeCoin,
+  ],
+});
+
+// Step 2: Resolve event (reads price atomically)
+tx.moveCall({
+  target: `${PACKAGE_ID}::blink_event::resolve_crypto_event`,
+  typeArguments: ['0x2::sui::SUI'],
+  arguments: [
+    tx.object(EVENT_ID),
+    tx.object(MARKET_ID),
+    tx.object(STORK_STATE),
+    tx.object('0x6'),
+  ],
+});
+```
+
+For more examples, see [FRONTEND_API.md](FRONTEND_API.md).
+
+---
 
 ## Contributing
 
-Contributions are welcome. Please ensure:
-- All tests pass (`sui move test`)
-- Code follows Sui Move conventions
-- New features include corresponding tests
-- Documentation is updated for public API changes
+We welcome contributions! Please follow these steps:
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+### Development Guidelines
+
+- ✅ Write comprehensive tests for new features
+- ✅ Follow existing code style and conventions
+- ✅ Update documentation for API changes
+- ✅ Ensure all tests pass (`sui move test`)
+- ✅ Add detailed commit messages
+
+---
+
+## Documentation
+
+- 📖 **Frontend API Guide:** [FRONTEND_API.md](FRONTEND_API.md)
+- 🧪 **Test Suite:** [tests/blinkmarket_tests.move](tests/blinkmarket_tests.move)
+- 📜 **Contract Source:**
+  - [sources/blink_config.move](sources/blink_config.move)
+  - [sources/blink_event.move](sources/blink_event.move)
+  - [sources/blink_position.move](sources/blink_position.move)
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+## Contact & Support
+
+- **GitHub Issues:** [Report bugs or request features](https://github.com/Blink-Markets/Blink-Markets-Contract/issues)
+- **Documentation:** [Frontend Integration Guide](FRONTEND_API.md)
+- **Sui Documentation:** https://docs.sui.io/
+- **Stork Oracle:** https://docs.stork.network/
+
+---
+
+## Acknowledgments
+
+- **Sui Foundation** — For the Sui blockchain and Move language
+- **Stork Network** — For oracle infrastructure
+- **Community Contributors** — Thank you for your support!
+
+---
+
+<div align="center">
+
+**Built with ❤️ on Sui**
+
+[⬆ Back to Top](#blinkmarket)
+
+</div>

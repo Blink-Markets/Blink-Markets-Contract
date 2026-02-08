@@ -4,8 +4,10 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
+
 [dependencies]
-# Sui dependency is automatically added by the CLI based on your active environment
+stork = { git = "https://github.com/stork-oracle/stork-external.git", subdir = "chains/sui/contracts", rev = "main" }
+
 
 [addresses]
 blinkmarket = "0x0"

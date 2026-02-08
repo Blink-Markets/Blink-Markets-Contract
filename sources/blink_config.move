@@ -41,10 +41,10 @@ public struct Market has key, store {
     oracles: VecMap<address, bool>, // Authorized oracles
 }
 
-/// Platform fee collection treasury
-public struct Treasury has key {
+/// Platform fee collection treasury (generic over coin type)
+public struct Treasury<phantom CoinType> has key {
     id: UID,
-    balance: Balance<SUI>,
+    balance: Balance<CoinType>,
     total_collected: u64,
 }
 
@@ -57,16 +57,16 @@ public struct MarketCreated has copy, drop {
 
 // ============== Initialization ==============
 
-/// Initialize the module - creates AdminCap and Treasury
+/// Initialize the module - creates AdminCap and default SUI Treasury
 fun init(ctx: &mut TxContext) {
     let admin_cap = AdminCap {
         id: object::new(ctx),
     };
     transfer::transfer(admin_cap, tx_context::sender(ctx));
 
-    let treasury = Treasury {
+    let treasury = Treasury<SUI> {
         id: object::new(ctx),
-        balance: balance::zero(),
+        balance: balance::zero<SUI>(),
         total_collected: 0,
     };
     transfer::share_object(treasury);
@@ -148,21 +148,34 @@ public fun is_oracle(market: &Market, addr: address): bool {
 
 // ============== Treasury Management ==============
 
-/// Withdraw fees from treasury (admin only)
-public fun withdraw_fees(
+/// Create a treasury for a specific coin type (admin only)
+public fun create_treasury<CoinType>(
     _admin: &AdminCap,
-    treasury: &mut Treasury,
+    ctx: &mut TxContext,
+) {
+    let treasury = Treasury<CoinType> {
+        id: object::new(ctx),
+        balance: balance::zero<CoinType>(),
+        total_collected: 0,
+    };
+    transfer::share_object(treasury);
+}
+
+/// Withdraw fees from treasury (admin only)
+public fun withdraw_fees<CoinType>(
+    _admin: &AdminCap,
+    treasury: &mut Treasury<CoinType>,
     amount: u64,
     ctx: &mut TxContext,
-): Coin<SUI> {
+): Coin<CoinType> {
     let withdraw_balance = balance::split(&mut treasury.balance, amount);
     coin::from_balance(withdraw_balance, ctx)
 }
 
 /// Add fees to treasury (package-internal function for other modules)
-public(package) fun add_fee_to_treasury(
-    treasury: &mut Treasury,
-    fee_balance: Balance<SUI>,
+public(package) fun add_fee_to_treasury<CoinType>(
+    treasury: &mut Treasury<CoinType>,
+    fee_balance: Balance<CoinType>,
 ) {
     let fee_amount = balance::value(&fee_balance);
     balance::join(&mut treasury.balance, fee_balance);
@@ -172,12 +185,12 @@ public(package) fun add_fee_to_treasury(
 // ============== View Functions ==============
 
 /// Get treasury balance
-public fun get_treasury_balance(treasury: &Treasury): u64 {
+public fun get_treasury_balance<CoinType>(treasury: &Treasury<CoinType>): u64 {
     balance::value(&treasury.balance)
 }
 
 /// Get total fees collected
-public fun get_total_fees_collected(treasury: &Treasury): u64 {
+public fun get_total_fees_collected<CoinType>(treasury: &Treasury<CoinType>): u64 {
     treasury.total_collected
 }
 

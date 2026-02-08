@@ -4,7 +4,6 @@ module blinkmarket::blink_position;
 
 use sui::coin::{Self, Coin};
 use sui::balance;
-use sui::sui::SUI;
 use sui::clock::Clock;
 use sui::event;
 
@@ -29,8 +28,8 @@ const CANCELLATION_FEE_BPS: u64 = 100; // 1% = 100 basis points
 
 // ============== Core Structs ==============
 
-/// User's stake on a specific outcome
-public struct Position has key, store {
+/// User's stake on a specific outcome (generic over coin type)
+public struct Position<phantom CoinType> has key, store {
     id: UID,
     event_id: ID,
     outcome_index: u8,
@@ -73,15 +72,15 @@ public struct RefundClaimed has copy, drop {
 // ============== Betting ==============
 
 /// Place a bet on an outcome
-public fun place_bet(
-    prediction_event: &mut PredictionEvent,
+public fun place_bet<CoinType>(
+    prediction_event: &mut PredictionEvent<CoinType>,
     market: &Market,
-    treasury: &mut Treasury,
+    treasury: &mut Treasury<CoinType>,
     outcome_index: u8,
-    stake: Coin<SUI>,
+    stake: Coin<CoinType>,
     clock: &Clock,
     ctx: &mut TxContext,
-): Position {
+): Position<CoinType> {
     // Validate market and event status
     blink_config::assert_market_active(market);
     assert!(
@@ -117,7 +116,7 @@ public fun place_bet(
     blink_event::add_to_pool(prediction_event, outcome_index, stake_balance, net_stake);
 
     let bettor = tx_context::sender(ctx);
-    let position = Position {
+    let position = Position<CoinType> {
         id: object::new(ctx),
         event_id: object::id(prediction_event),
         outcome_index,
@@ -138,13 +137,12 @@ public fun place_bet(
 }
 
 /// Cancel a bet before event is locked (1% fee)
-public fun cancel_bet(
-    prediction_event: &mut PredictionEvent,
-    position: Position,
+public fun cancel_bet<CoinType>(
+    prediction_event: &mut PredictionEvent<CoinType>,
+    position: Position<CoinType>,
     ctx: &mut TxContext,
-): Coin<SUI> {
+): Coin<CoinType> {
     // Can only cancel when event is still OPEN
-    // We need to check the status manually since we want a different error code
     assert!(blink_event::get_event_status(prediction_event) == 1, EEventAlreadyLocked); // STATUS_OPEN = 1
     assert!(position.event_id == object::id(prediction_event), EEventMismatch);
     assert!(!position.is_claimed, EPositionAlreadyClaimed);
@@ -179,11 +177,11 @@ public fun cancel_bet(
 // ============== Claims ==============
 
 /// Claim winnings for a winning position
-public fun claim_winnings(
-    prediction_event: &mut PredictionEvent,
-    position: &mut Position,
+public fun claim_winnings<CoinType>(
+    prediction_event: &mut PredictionEvent<CoinType>,
+    position: &mut Position<CoinType>,
     ctx: &mut TxContext,
-): Coin<SUI> {
+): Coin<CoinType> {
     // Validate ownership
     assert!(tx_context::sender(ctx) == position.owner, ENotAuthorized);
 
@@ -197,7 +195,6 @@ public fun claim_winnings(
     );
 
     // Calculate payout: (user_stake / winning_pool_at_resolution) * total_pool
-    // Use the winning pool balance recorded at resolution (before losing pools were merged)
     let winning_pool_balance = blink_event::get_winning_pool_at_resolution(prediction_event);
     let total_pool = blink_event::get_total_pool_amount(prediction_event);
 
@@ -223,11 +220,11 @@ public fun claim_winnings(
 }
 
 /// Claim refund for a cancelled event
-public fun claim_refund(
-    prediction_event: &mut PredictionEvent,
-    position: Position,
+public fun claim_refund<CoinType>(
+    prediction_event: &mut PredictionEvent<CoinType>,
+    position: Position<CoinType>,
     ctx: &mut TxContext,
-): Coin<SUI> {
+): Coin<CoinType> {
     // Validate ownership
     assert!(tx_context::sender(ctx) == position.owner, ENotAuthorized);
 
@@ -261,18 +258,18 @@ public fun claim_refund(
 // ============== View Functions ==============
 
 /// Get position details
-public fun get_position_stake(position: &Position): u64 {
+public fun get_position_stake<CoinType>(position: &Position<CoinType>): u64 {
     position.stake_amount
 }
 
-public fun get_position_outcome(position: &Position): u8 {
+public fun get_position_outcome<CoinType>(position: &Position<CoinType>): u8 {
     position.outcome_index
 }
 
-public fun is_position_claimed(position: &Position): bool {
+public fun is_position_claimed<CoinType>(position: &Position<CoinType>): bool {
     position.is_claimed
 }
 
-public fun get_position_owner(position: &Position): address {
+public fun get_position_owner<CoinType>(position: &Position<CoinType>): address {
     position.owner
 }
