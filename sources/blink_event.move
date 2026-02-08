@@ -56,6 +56,7 @@ public struct PredictionEvent has key, store {
     status: u8,
     betting_start_time: u64,
     betting_end_time: u64,
+    duration: u64,
     winning_outcome: u8,
     creator: address,
     resolved_at: u64,
@@ -85,8 +86,7 @@ public fun create_event(
     market: &Market,
     description: vector<u8>,
     outcome_labels: vector<vector<u8>>,
-    betting_start_time: u64,
-    betting_end_time: u64,
+    duration: u64,
     ctx: &mut TxContext,
 ) {
     blink_config::assert_market_active(market);
@@ -115,8 +115,9 @@ public fun create_event(
         outcome_pools,
         total_pool: 0,
         status: STATUS_CREATED,
-        betting_start_time,
-        betting_end_time,
+        betting_start_time: 0,
+        betting_end_time: 0,
+        duration,
         winning_outcome: 0,
         creator: tx_context::sender(ctx),
         resolved_at: 0,
@@ -137,12 +138,16 @@ public fun create_event(
 public fun open_event(
     creator_cap: &MarketCreatorCap,
     prediction_event: &mut PredictionEvent,
+    clock : &Clock,
 ) {
+    let start = clock::timestamp_ms(clock);
     assert!(
         prediction_event.market_id == blink_config::get_creator_cap_market_id(creator_cap),
         EEventMismatch
     );
     assert!(prediction_event.status == STATUS_CREATED, EEventNotOpen);
+    prediction_event.betting_start_time = start;
+    prediction_event.betting_end_time = start + prediction_event.duration;
     prediction_event.status = STATUS_OPEN;
 }
 
@@ -178,6 +183,7 @@ public fun cancel_event(
 }
 
 /// Resolve an event with the winning outcome (oracle only)
+/// Automatically locks the event if betting_end_time has passed
 public fun resolve_event(
     prediction_event: &mut PredictionEvent,
     market: &Market,
@@ -191,7 +197,19 @@ public fun resolve_event(
 
     // Validate event state
     assert!(prediction_event.market_id == object::id(market), EEventMismatch);
-    assert!(prediction_event.status == STATUS_LOCKED, EEventNotOpen);
+
+    // Auto-lock: accept LOCKED state, or OPEN state if betting time has ended
+    let current_time = clock::timestamp_ms(clock);
+    assert!(
+        prediction_event.status == STATUS_LOCKED ||
+        (prediction_event.status == STATUS_OPEN && current_time >= prediction_event.betting_end_time),
+        EEventNotOpen
+    );
+
+    // Transition OPEN → LOCKED if auto-locking
+    if (prediction_event.status == STATUS_OPEN) {
+        prediction_event.status = STATUS_LOCKED;
+    };
 
     // Validate winning outcome
     let num_outcomes = prediction_event.outcome_labels.length();

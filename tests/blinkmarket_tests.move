@@ -84,8 +84,7 @@ fun create_test_event(scenario: &mut Scenario, creator_cap: &MarketCreatorCap) {
         &market,
         b"Will the next shot be a 3-pointer?",
         outcome_labels,
-        0, // betting starts immediately
-        1000000000000, // betting ends far in the future
+        1000000000000, // duration in ms
         ts::ctx(scenario),
     );
 
@@ -220,13 +219,15 @@ fun test_event_lifecycle_created_to_open() {
 
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         assert!(blink_event::get_event_status(&event) == blink_event::get_status_open(), 1);
         ts::return_shared(event);
     };
 
+    clock::destroy_for_testing(clock);
     test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
@@ -239,14 +240,16 @@ fun test_event_lifecycle_open_to_locked() {
 
     // Open then lock
     ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         blink_event::lock_event(&creator_cap, &mut event);
         assert!(blink_event::get_event_status(&event) == blink_event::get_status_locked(), 0);
         ts::return_shared(event);
     };
 
+    clock::destroy_for_testing(clock);
     test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
@@ -259,14 +262,16 @@ fun test_event_cancellation() {
 
     // Open then cancel
     ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         blink_event::cancel_event(&creator_cap, &mut event);
         assert!(blink_event::get_event_status(&event) == blink_event::get_status_cancelled(), 0);
         ts::return_shared(event);
     };
 
+    clock::destroy_for_testing(clock);
     test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
@@ -279,17 +284,17 @@ fun test_place_bet() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    // Create clock
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // Place bet
     ts::next_tx(&mut scenario, USER_A);
@@ -338,16 +343,17 @@ fun test_place_bet_stake_too_low() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // Try to place bet with stake below minimum
     ts::next_tx(&mut scenario, USER_A);
@@ -434,25 +440,26 @@ fun test_place_bet_after_betting_window() {
             &market,
             b"Test event",
             outcome_labels,
-            0, // betting starts at 0
-            100, // betting ends at 100ms
+            100, // duration in ms
             ts::ctx(&mut scenario),
         );
 
         ts::return_shared(market);
     };
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
 
-    // Create clock set after betting window
-    ts::next_tx(&mut scenario, USER_A);
-    let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+    // Set clock past betting window (event has 100ms duration)
     clock::set_for_testing(&mut clock, 200); // After betting window
 
     ts::next_tx(&mut scenario, USER_A);
@@ -492,16 +499,17 @@ fun test_full_betting_resolution_and_claim() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A bets 100 on Yes (outcome 0)
     ts::next_tx(&mut scenario, USER_A);
@@ -640,16 +648,17 @@ fun test_double_claim_prevention() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A places bet
     ts::next_tx(&mut scenario, USER_A);
@@ -731,16 +740,17 @@ fun test_claim_losing_position() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A bets on No (outcome 1)
     ts::next_tx(&mut scenario, USER_A);
@@ -809,16 +819,17 @@ fun test_refund_on_cancelled_event() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A places bet
     ts::next_tx(&mut scenario, USER_A);
@@ -880,16 +891,17 @@ fun test_cancel_bet_before_lock() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A places bet
     ts::next_tx(&mut scenario, USER_A);
@@ -942,16 +954,17 @@ fun test_cancel_bet_after_lock_fails() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A places bet
     ts::next_tx(&mut scenario, USER_A);
@@ -1011,17 +1024,18 @@ fun test_non_oracle_cannot_resolve() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open and lock the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // Non-oracle tries to resolve (should fail)
     ts::next_tx(&mut scenario, USER_A);
@@ -1048,16 +1062,17 @@ fun test_get_odds() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // Place bets
     ts::next_tx(&mut scenario, USER_A);
@@ -1095,16 +1110,17 @@ fun test_calculate_potential_payout() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // Place initial bet
     ts::next_tx(&mut scenario, USER_A);
@@ -1140,16 +1156,17 @@ fun test_withdraw_fees() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // Place bet to generate fees
     ts::next_tx(&mut scenario, USER_A);
@@ -1207,8 +1224,7 @@ fun test_multi_outcome_event() {
             &market,
             b"Who wins the match?",
             outcome_labels,
-            0,
-            1000000000000,
+            1000000000000, // duration in ms
             ts::ctx(&mut scenario),
         );
 
@@ -1217,9 +1233,10 @@ fun test_multi_outcome_event() {
 
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
 
         // Verify 4 outcomes
         let odds = blink_event::get_odds(&event);
@@ -1228,6 +1245,7 @@ fun test_multi_outcome_event() {
         ts::return_shared(event);
     };
 
+    clock::destroy_for_testing(clock);
     test_utils::destroy(creator_cap);
     ts::end(scenario);
 }
@@ -1249,8 +1267,7 @@ fun test_too_few_outcomes() {
             &market,
             b"Invalid event",
             outcome_labels,
-            0,
-            1000000000000,
+            1000000000000, // duration in ms
             ts::ctx(&mut scenario),
         );
 
@@ -1278,16 +1295,17 @@ fun test_multiple_winners_claim_correct_proportional_payout() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     // Open the event
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A bets 100M on Yes (outcome 0)
     ts::next_tx(&mut scenario, USER_A);
@@ -1395,15 +1413,16 @@ fun test_claim_winnings_wrong_owner() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     ts::next_tx(&mut scenario, USER_A);
     {
@@ -1463,15 +1482,16 @@ fun test_claim_refund_wrong_owner() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     ts::next_tx(&mut scenario, USER_A);
     {
@@ -1523,17 +1543,18 @@ fun test_resolved_at_timestamp() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
+    clock::set_for_testing(&mut clock, 1234567890);
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         blink_event::lock_event(&creator_cap, &mut event);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, ORACLE);
-    let mut clock = clock::create_for_testing(ts::ctx(&mut scenario));
-    clock::set_for_testing(&mut clock, 1234567890);
 
     ts::next_tx(&mut scenario, ORACLE);
     {
@@ -1559,15 +1580,16 @@ fun test_losing_pools_merged_into_winning_pool_on_resolve() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     ts::next_tx(&mut scenario, USER_A);
     {
@@ -1645,15 +1667,16 @@ fun test_single_winner_gets_entire_pool() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // User A bets 100M on Yes -> net 98M
     ts::next_tx(&mut scenario, USER_A);
@@ -1732,22 +1755,22 @@ fun test_three_outcome_resolution_and_claim() {
             &market,
             b"Who wins? A, B, or Draw",
             vector[b"Team A", b"Team B", b"Draw"],
-            0,
-            1000000000000,
+            1000000000000, // duration in ms
             ts::ctx(&mut scenario),
         );
         ts::return_shared(market);
     };
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // A bets 100M on Team A (0) -> net 98M
     ts::next_tx(&mut scenario, USER_A);
@@ -1844,15 +1867,16 @@ fun test_get_position_owner() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     ts::next_tx(&mut scenario, USER_A);
     {
@@ -1882,15 +1906,16 @@ fun test_equal_stakes_on_winning_side() {
     add_oracle_to_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     // A and B each bet 100M on Yes -> net 98M each
     ts::next_tx(&mut scenario, USER_A);
@@ -1993,22 +2018,22 @@ fun test_large_values_no_overflow() {
             &market,
             b"Large value test",
             vector[b"Yes", b"No"],
-            0,
-            1000000000000,
+            1000000000000, // duration in ms
             ts::ctx(&mut scenario),
         );
         ts::return_shared(market);
     };
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     ts::next_tx(&mut scenario, USER_A);
     {
@@ -2077,15 +2102,16 @@ fun test_multiple_refunds_on_cancelled_event() {
     let creator_cap = create_test_market(&mut scenario);
     create_test_event(&mut scenario, &creator_cap);
 
+    // Create clock
+    ts::next_tx(&mut scenario, ADMIN);
+    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
+
     ts::next_tx(&mut scenario, ADMIN);
     {
         let mut event = ts::take_shared<PredictionEvent>(&scenario);
-        blink_event::open_event(&creator_cap, &mut event);
+        blink_event::open_event(&creator_cap, &mut event, &clock);
         ts::return_shared(event);
     };
-
-    ts::next_tx(&mut scenario, USER_A);
-    let clock = clock::create_for_testing(ts::ctx(&mut scenario));
 
     ts::next_tx(&mut scenario, USER_A);
     {
