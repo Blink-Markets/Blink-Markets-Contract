@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+
 import { StorkOracleService } from '../src/services/StorkOracleService';
 import { config } from '../src/config';
 

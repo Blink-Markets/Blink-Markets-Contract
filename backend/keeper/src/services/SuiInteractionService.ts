@@ -132,7 +132,7 @@ export class SuiInteractionService {
       }
 
       // Extract gas used
-      const gasUsed = result.effects?.gasUsed?.computationCost || 0;
+      const gasUsed = Number(result.effects?.gasUsed?.computationCost || 0);
       gasUsedHistogram.observe(gasUsed);
 
       // Parse EventResolved event
@@ -144,8 +144,9 @@ export class SuiInteractionService {
       let oraclePrice: string | undefined;
 
       if (resolvedEvent && resolvedEvent.parsedJson) {
-        winningOutcome = resolvedEvent.parsedJson.winning_outcome;
-        oraclePrice = resolvedEvent.parsedJson.oracle_price;
+        const parsed = resolvedEvent.parsedJson as any;
+        winningOutcome = parsed.winning_outcome;
+        oraclePrice = parsed.oracle_price;
       }
 
       logger.info('Successfully resolved crypto event', {
@@ -291,7 +292,7 @@ export class SuiInteractionService {
         transactionBlock: await tx.build({ client: this.client }),
       });
 
-      const gasUsed = dryRunResult.effects.gasUsed.computationCost || 0;
+      const gasUsed = Number(dryRunResult.effects.gasUsed.computationCost || 0);
       return gasUsed;
     } catch (error: any) {
       logger.warn('Failed to estimate gas', { error: error.message });

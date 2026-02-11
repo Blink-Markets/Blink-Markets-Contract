@@ -1,3 +1,5 @@
+/// <reference types="jest" />
+
 import { ResolutionLockService } from '../src/services/ResolutionLockService';
 
 // Mock Redis
