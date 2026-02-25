@@ -8,11 +8,13 @@ use sui::event;
 
 use blinkmarket::blink_config::{Self, MarketCreatorCap, Market};
 
-// Stork oracle imports
-use stork::stork;
-use stork::state::StorkState;
-use stork::temporal_numeric_value;
-use stork::i128;
+// Pyth oracle imports
+use pyth::pyth;
+use pyth::state::State as PythState;
+use pyth::price_info::{Self as pyth_price_info, PriceInfoObject};
+use pyth::price;
+use pyth::price_identifier;
+use pyth::i64 as pyth_i64;
 
 // ============== Error Constants ==============
 
@@ -55,6 +57,7 @@ const MIN_OUTCOMES: u64 = 2;
 const MAX_OUTCOMES: u64 = 10;
 const BPS_DENOMINATOR: u64 = 10000;
 const FEED_ID_LENGTH: u64 = 32;
+const ORACLE_TARGET_DECIMALS: u64 = 8;
 
 /// Get BPS denominator (package-internal helper)
 public(package) fun get_bps_denominator(): u64 {
@@ -275,8 +278,8 @@ public fun cancel_event<CoinType>(
 
 // ============== Resolution ==============
 
-/// Resolve a crypto event using Stork oracle price feed.
-/// Backend must update the Stork feed in the same PTB before calling this.
+/// Resolve a crypto event using Pyth oracle price feed.
+/// Keeper should update the Pyth feed in the same PTB before calling this.
 ///
 /// Execution order optimized for minimal timing drift and gas waste:
 /// 1. Cheap validations (authorization, status, timing)
@@ -287,7 +290,8 @@ public fun cancel_event<CoinType>(
 public fun resolve_crypto_event<CoinType>(
     prediction_event: &mut PredictionEvent<CoinType>,
     market: &Market,
-    stork_state: &StorkState,
+    pyth_state: &PythState,
+    pyth_price_info_object: &PriceInfoObject,
     clock: &Clock,
     ctx: &mut TxContext,
 ) {
@@ -315,15 +319,24 @@ public fun resolve_crypto_event<CoinType>(
 
     // === Step 3: Read oracle price (time-sensitive — minimize delay) ===
 
-    let price_data = stork::get_temporal_numeric_value_unchecked(
-        stork_state,
-        prediction_event.oracle_feed_id
+    // Ensure the provided PriceInfoObject matches the event feed.
+    let price_info = pyth_price_info::get_price_info_from_price_info_object(pyth_price_info_object);
+    let price_identifier = pyth_price_info::get_price_identifier(&price_info);
+    let feed_id_bytes = price_identifier::get_bytes(&price_identifier);
+    assert!(feed_id_bytes == prediction_event.oracle_feed_id, EInvalidFeedId);
+
+    let latest_price = pyth::get_price(
+        pyth_state,
+        pyth_price_info_object,
+        clock,
     );
-    let quantized_value = temporal_numeric_value::get_quantized_value(&price_data);
+    let raw_price = price::get_price(&latest_price);
 
     // For crypto, price should always be positive
-    assert!(!i128::is_negative(&quantized_value), ENegativeOraclePrice);
-    let oracle_price = i128::get_magnitude(&quantized_value);
+    assert!(!pyth_i64::get_is_negative(&raw_price), ENegativeOraclePrice);
+    let raw_price_magnitude = pyth_i64::get_magnitude_if_positive(&raw_price);
+    let raw_expo = price::get_expo(&latest_price);
+    let oracle_price = normalize_price_to_target_decimals(raw_price_magnitude, raw_expo);
 
     // Store the oracle price for auditability
     prediction_event.oracle_price_at_resolution = oracle_price;
@@ -371,6 +384,37 @@ public fun resolve_crypto_event<CoinType>(
         event_type: EVENT_TYPE_CRYPTO,
         oracle_price,
     });
+}
+
+fun normalize_price_to_target_decimals(raw_price: u64, expo: pyth_i64::I64): u128 {
+    let target_decimals = ORACLE_TARGET_DECIMALS;
+    if (pyth_i64::get_is_negative(&expo)) {
+        let current_decimals = pyth_i64::get_magnitude_if_negative(&expo);
+        if (current_decimals == target_decimals) {
+            return raw_price as u128
+        };
+        if (current_decimals > target_decimals) {
+            let divisor = pow10_u128(current_decimals - target_decimals);
+            return (raw_price as u128) / divisor
+        };
+
+        let multiplier = pow10_u128(target_decimals - current_decimals);
+        return (raw_price as u128) * multiplier
+    };
+
+    let positive_expo = pyth_i64::get_magnitude_if_positive(&expo);
+    let multiplier = pow10_u128(positive_expo + target_decimals);
+    (raw_price as u128) * multiplier
+}
+
+fun pow10_u128(exp: u64): u128 {
+    let mut result = 1u128;
+    let mut i = 0;
+    while (i < exp) {
+        result = result * 10;
+        i = i + 1;
+    };
+    result
 }
 
 /// Resolve a manual event with a manually-specified winning outcome (oracle only).
@@ -663,7 +707,7 @@ public fun get_event_type_crypto(): u8 { EVENT_TYPE_CRYPTO }
 public fun get_event_type_manual(): u8 { EVENT_TYPE_MANUAL }
 
 /// Test-only resolve for crypto events — accepts oracle_price directly,
-/// bypassing Stork oracle read. Used for unit testing.
+/// bypassing Pyth oracle read. Used for unit testing.
 #[test_only]
 public fun resolve_crypto_event_for_testing<CoinType>(
     prediction_event: &mut PredictionEvent<CoinType>,
