@@ -10,9 +10,9 @@ export const eventsResolvedTotal = new Counter({
   registers: [register],
 });
 
-export const storkApiCallsTotal = new Counter({
-  name: 'blinkmarket_stork_api_calls_total',
-  help: 'Total number of Stork API calls',
+export const oracleApiCallsTotal = new Counter({
+  name: 'blinkmarket_oracle_api_calls_total',
+  help: 'Total number of oracle API calls',
   labelNames: ['status'],
   registers: [register],
 });
@@ -45,9 +45,9 @@ export const resolutionDurationHistogram = new Histogram({
   registers: [register],
 });
 
-export const storkApiDurationHistogram = new Histogram({
-  name: 'blinkmarket_stork_api_duration_seconds',
-  help: 'Duration of Stork API calls',
+export const oracleApiDurationHistogram = new Histogram({
+  name: 'blinkmarket_oracle_api_duration_seconds',
+  help: 'Duration of oracle API calls',
   buckets: [0.05, 0.1, 0.25, 0.5, 1, 2],
   registers: [register],
 });

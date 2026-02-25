@@ -84,8 +84,8 @@ public struct PredictionEvent<phantom CoinType> has key, store {
     winning_pool_at_resolution: u64,
     // Oracle integration fields
     event_type: u8,                    // EVENT_TYPE_CRYPTO or EVENT_TYPE_MANUAL
-    oracle_feed_id: vector<u8>,        // 32-byte Stork feed ID (empty for manual)
-    target_price: u128,                // Target price threshold (0 for manual)
+    oracle_feed_id: vector<u8>,        // 32-byte Pyth feed ID (empty for manual)
+    target_price: u128,                // Target price threshold (USD 1e8 precision, 0 for manual)
     oracle_price_at_resolution: u128,  // Actual oracle price at resolution (0 for manual)
 }
 
@@ -111,7 +111,7 @@ public struct EventResolved has copy, drop {
 
 // ============== Event Creation ==============
 
-/// Create a new crypto prediction event (binary: above/below target price)
+/// Create a new crypto prediction event (binary: above/below target price, USD 1e8 precision)
 public fun create_crypto_event<CoinType>(
     creator_cap: &MarketCreatorCap,
     market: &Market,
