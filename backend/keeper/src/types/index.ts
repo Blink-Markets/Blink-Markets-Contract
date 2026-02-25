@@ -52,5 +52,5 @@ export enum EventType {
 
 export const FEED_ID_TO_SYMBOL: Record<string, string> = {
   // SUI/USD (Pyth Sui testnet)
-  '0x50c67b8caa9a5ef62431dab6e49f05e38f39d6acb39116c52def86f2c14825a9': 'SUI/USD',
+  '0x50c67b3f0a9bf5f93d10887c5f60ca6f50d46e26b8e1728bd7708a9bf0f6f7d0': 'SUI/USD',
 };
