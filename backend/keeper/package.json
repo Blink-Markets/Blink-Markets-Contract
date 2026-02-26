@@ -1,7 +1,7 @@
 {
   "name": "blinkmarket-keeper",
   "version": "1.0.0",
-  "description": "Keeper service for Blinkmarket Stork Oracle integration",
+  "description": "Keeper service for Blinkmarket Pyth Oracle integration",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
@@ -15,14 +15,15 @@
   "keywords": [
     "sui",
     "oracle",
-    "stork",
+    "pyth",
     "keeper",
     "prediction-market"
   ],
   "author": "Blink Markets",
   "license": "MIT",
   "dependencies": {
-    "@mysten/sui.js": "^0.54.1",
+    "@mysten/sui": "^1.33.0",
+    "@pythnetwork/pyth-sui-js": "^3.0.0",
     "axios": "^1.6.5",
     "dotenv": "^16.3.1",
     "express": "^5.2.1",

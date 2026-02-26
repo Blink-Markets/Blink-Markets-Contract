@@ -35,7 +35,7 @@ const MIN_STAKE: u64 = 1_000_000; // 0.001 SUI
 const MAX_STAKE: u64 = 1_000_000_000; // 1 SUI
 const PLATFORM_FEE_BPS: u64 = 200; // 2%
 const DEFAULT_DURATION: u64 = 1_000_000_000_000; // duration in ms
-const TEST_TARGET_PRICE: u128 = 62_000_000_000_000_000_000_000; // $62,000 with 18 decimal precision
+const TEST_TARGET_PRICE: u128 = 6_200_000_000_000; // $62,000 with 1e8 precision
 
 // Test-only coin type for generic treasury tests
 public struct USDC has drop {}
