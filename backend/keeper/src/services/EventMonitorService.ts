@@ -1,5 +1,5 @@
 import { SuiInteractionService } from './SuiInteractionService';
-import { StorkOracleService } from './StorkOracleService';
+import { PythOracleService } from './PythOracleService';
 import { ResolutionLockService } from './ResolutionLockService';
 import { config } from '../config';
 import logger from '../utils/logger';
@@ -12,7 +12,7 @@ import { PredictionEvent, ResolutionTask, FEED_ID_TO_SYMBOL } from '../types';
 
 export class EventMonitorService {
   private suiService: SuiInteractionService;
-  private storkService: StorkOracleService;
+  private pythService: PythOracleService;
   private lockService: ResolutionLockService;
   private isRunning = false;
   private pollingInterval: NodeJS.Timeout | null = null;
@@ -21,11 +21,11 @@ export class EventMonitorService {
 
   constructor(
     suiService: SuiInteractionService,
-    storkService: StorkOracleService,
+    pythService: PythOracleService,
     lockService: ResolutionLockService
   ) {
     this.suiService = suiService;
-    this.storkService = storkService;
+    this.pythService = pythService;
     this.lockService = lockService;
   }
 
@@ -124,6 +124,14 @@ export class EventMonitorService {
    * Add event to batch queue
    */
   private async addToBatch(event: PredictionEvent): Promise<void> {
+    if (event.oracleFeedId.toLowerCase() !== config.pythFeedSuiUsd.toLowerCase()) {
+      logger.debug('Skipping unsupported feed for v1 keeper', {
+        eventId: event.id,
+        oracleFeedId: event.oracleFeedId,
+      });
+      return;
+    }
+
     // Check if already in batch
     if (this.batchQueue.has(event.id)) {
       return;
@@ -181,8 +189,8 @@ export class EventMonitorService {
       feedIds: feedIds.map(id => FEED_ID_TO_SYMBOL[id] || id),
     });
 
-    // Fetch all prices in batch from Stork
-    const priceMap = await this.storkService.getBatchPrices(feedIds);
+    // Fetch all required price updates from Hermes
+    const priceMap = await this.pythService.getBatchPrices(feedIds);
 
     // Process each task
     const results = await Promise.allSettled(
@@ -224,7 +232,7 @@ export class EventMonitorService {
         return;
       }
 
-      // Get price data
+      // Get Pyth update data
       const priceData = priceMap.get(feedId);
       if (!priceData) {
         logger.error('No price data for event', {

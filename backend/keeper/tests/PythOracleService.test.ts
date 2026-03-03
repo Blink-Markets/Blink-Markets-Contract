@@ -1,13 +1,12 @@
 /// <reference types="jest" />
 
-import { StorkOracleService } from '../src/services/StorkOracleService';
-import { config } from '../src/config';
+import { PythOracleService } from '../src/services/PythOracleService';
 
-describe('StorkOracleService', () => {
-  let service: StorkOracleService;
+describe('PythOracleService', () => {
+  let service: PythOracleService;
 
   beforeEach(() => {
-    service = new StorkOracleService();
+    service = new PythOracleService();
   });
 
   describe('isValidFeedId', () => {
@@ -28,26 +27,6 @@ describe('StorkOracleService', () => {
     });
   });
 
-  describe('feedIdToBytes', () => {
-    it('should convert feed ID to byte array', () => {
-      const feedId = '0x7404e3d104ea7841c3d9e6fd20adfe99b4ad586bc08d8f3bd3afef894cf184de';
-      const bytes = service.feedIdToBytes(feedId);
-      
-      expect(bytes).toHaveLength(32);
-      expect(bytes[0]).toBe(0x74);
-      expect(bytes[1]).toBe(0x04);
-      expect(bytes[31]).toBe(0xde);
-    });
-
-    it('should handle feed ID without 0x prefix', () => {
-      const feedId = '7404e3d104ea7841c3d9e6fd20adfe99b4ad586bc08d8f3bd3afef894cf184de';
-      const bytes = service.feedIdToBytes(feedId);
-      
-      expect(bytes).toHaveLength(32);
-    });
-  });
-
-  // Note: Actual API tests require valid credentials and should be integration tests
   describe('getLatestPrice', () => {
     it('should return null on invalid feed ID', async () => {
       const result = await service.getLatestPrice('invalid_feed_id');

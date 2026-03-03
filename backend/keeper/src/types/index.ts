@@ -12,11 +12,10 @@ export interface PredictionEvent {
   totalPool: number;
 }
 
-export interface StorkPriceData {
+export interface PythPriceUpdateData {
   id: string;
-  timestamp: number;
-  quantizedValue: string;
-  encodedSignedData: Uint8Array;
+  fetchedAt: number;
+  priceFeedUpdateData: Buffer[];
 }
 
 export interface ResolutionTask {
@@ -52,8 +51,6 @@ export enum EventType {
 }
 
 export const FEED_ID_TO_SYMBOL: Record<string, string> = {
-  '0x7404e3d104ea7841c3d9e6fd20adfe99b4ad586bc08d8f3bd3afef894cf184de': 'BTC/USD',
-  '0x59102b37de83bdda9f38ac8254e596f0d9ac61d2035c07936675e87342817160': 'ETH/USD',
-  '0x1dcd89dfded9e8a9b0fa1745a8ebbacbb7c81e33d5abc81616633206d932e837': 'SOL/USD',
-  '0xa24cc95a4f3d70a0a2f7ac652b67a4a73791631ff06b4ee7f729097311169b81': 'SUI/USD',
+  // SUI/USD (Pyth Sui testnet)
+  '0x50c67b3f0a9bf5f93d10887c5f60ca6f50d46e26b8e1728bd7708a9bf0f6f7d0': 'SUI/USD',
 };

@@ -1,7 +1,7 @@
 import express from 'express';
 import { register } from './utils/metrics';
 import { SuiInteractionService } from './services/SuiInteractionService';
-import { StorkOracleService } from './services/StorkOracleService';
+import { PythOracleService } from './services/PythOracleService';
 import { ResolutionLockService } from './services/ResolutionLockService';
 import { EventMonitorService } from './services/EventMonitorService';
 import { config } from './config';
@@ -16,11 +16,11 @@ async function main() {
 
   // Initialize services
   const suiService = new SuiInteractionService();
-  const storkService = new StorkOracleService();
+  const pythService = new PythOracleService();
   const lockService = new ResolutionLockService();
   const monitorService = new EventMonitorService(
     suiService,
-    storkService,
+    pythService,
     lockService
   );
 
